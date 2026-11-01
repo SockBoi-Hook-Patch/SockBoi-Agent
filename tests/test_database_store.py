@@ -135,3 +135,21 @@ def test_audit_head_initializes_from_existing_chain_on_upgrade(tmp_path):
     result = upgraded.verify_audit_chain()
     assert result["valid"] is True
     assert result["event_count"] == 2
+
+
+def test_engagement_scoped_audit_chain_ignores_other_engagements(tmp_path):
+    from uuid import uuid4
+
+    database = DatabaseStore("sqlite+pysqlite:///" + str(tmp_path / "scoped-chain.db"))
+    first_id, second_id = uuid4(), uuid4()
+    database.log(AuditEvent(
+        engagement_id=first_id, event_type="first.created", actor="operator",
+    ))
+    before = database.verify_audit_chain(first_id)
+    database.log(AuditEvent(
+        engagement_id=second_id, event_type="second.created", actor="operator",
+    ))
+    after = database.verify_audit_chain(first_id)
+    assert before == after
+    assert after["event_count"] == 1
+    assert "head_matches" not in after
