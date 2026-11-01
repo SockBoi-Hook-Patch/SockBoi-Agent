@@ -21,11 +21,10 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
+from pydantic import ValidationError
 from sqlalchemy.pool import StaticPool
 
-from pydantic import ValidationError
-
-from .audit import ChainedEvent, GENESIS_HASH, event_hash, verify_chain
+from .audit import GENESIS_HASH, ChainedEvent, event_hash, verify_chain
 from .models import Approval, AuditEvent, Engagement, Finding
 
 
