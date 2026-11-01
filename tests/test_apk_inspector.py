@@ -25,7 +25,7 @@ def test_inspects_apk_without_extracting_and_hashes_content():
     data = make_apk({
         "AndroidManifest.xml": manifest,
         "classes.dex": b"dex\n039\x00" + b"x" * 32,
-        "lib/arm64-v8a/libsample.so": b"\x7fELF" + bytes([2, 1, 1, 0]) + b"\x00" * 12 + b"\xb7\x00",
+        "lib/arm64-v8a/libsample.so": b"\x7fELF" + bytes([2, 1, 1, 0]) + b"\x00" * 10 + b"\xb7\x00",
         "res/values/strings.xml": b"<resources/>",
         "assets/config.json": b"{}",
     })
