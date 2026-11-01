@@ -317,3 +317,14 @@ def verify_audit_chain(engagement_id: UUID, request: Request) -> dict:
     _require_role(request, "admin", "reviewer")
     _get_engagement(engagement_id, request)
     return store.verify_audit_chain()
+
+
+@app.get("/engagements/{engagement_id}/audit/checkpoint")
+def create_audit_checkpoint(engagement_id: UUID, request: Request) -> dict:
+    """Create a signed checkpoint; callers must retain it outside this database."""
+    _require_role(request, "admin", "reviewer")
+    _get_engagement(engagement_id, request)
+    try:
+        return store.create_audit_checkpoint()
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
