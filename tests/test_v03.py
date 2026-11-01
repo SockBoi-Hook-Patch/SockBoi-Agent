@@ -11,7 +11,7 @@ from sockboi.policy import PolicyDenied, authorize_action
 from sockboi.store import store
 from sockboi.tool_registry import list_tools
 
-client = TestClient(app)
+client = TestClient(app, headers={'Authorization': 'Bearer test-key'})
 
 
 def setup_function():

@@ -1,7 +1,8 @@
 """SockBoi Agent HTTP API."""
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
@@ -20,12 +21,34 @@ from .models import (
 from .policy import PolicyDenied, asset_matches, authorize_action
 from .store import store
 from .tool_registry import list_tools
+from .security import authenticate_api_key, load_keyring
 
 app = FastAPI(
     title="SockBoi Agent",
     version=__version__,
     description="Modular Agent + Skills + MCP platform for authorized security assessments.",
 )
+
+@app.middleware("http")
+async def require_api_identity(request: Request, call_next):
+    """Fail-closed authentication for every API route except the liveness endpoint."""
+    if request.url.path == "/health" or request.method == "OPTIONS":
+        return await call_next(request)
+    try:
+        keyring = load_keyring()
+    except ValueError:
+        return JSONResponse(status_code=503, content={"detail": "API key configuration is invalid"})
+    if not keyring:
+        return JSONResponse(status_code=503, content={"detail": "API authentication is not configured"})
+    authorization = request.headers.get("authorization", "")
+    scheme, _, credential = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not credential:
+        return JSONResponse(status_code=401, content={"detail": "Bearer API key required"})
+    try:
+        request.state.principal = authenticate_api_key(credential, keyring)
+    except PermissionError:
+        return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
+    return await call_next(request)
 
 
 class SkillIngestRequest(BaseModel):
