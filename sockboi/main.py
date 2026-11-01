@@ -1,8 +1,7 @@
 """SockBoi Agent HTTP API."""
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
-
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
