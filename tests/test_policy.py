@@ -35,13 +35,17 @@ def test_active_requires_approval():
         authorize_action(engagement(), "staging.example.org", ActionRisk.ACTIVE)
 
 
-def test_approved_active_action():
+def test_approved_active_action_is_exactly_bound():
     item = engagement()
     approval = Approval(
         engagement_id=item.id, action="safe_validation",
-        requested_by="tester", approved=True,
+        target="staging.example.org", technique_id="web.headers_review",
+        requested_by="requester", approved_by="reviewer", approved=True,
     )
-    authorize_action(item, "staging.example.org", ActionRisk.ACTIVE, approval)
+    authorize_action(
+        item, "staging.example.org", ActionRisk.ACTIVE,
+        approval, "web.headers_review",
+    )
 
 
 def test_wrong_engagement_approval_denied():
@@ -49,7 +53,11 @@ def test_wrong_engagement_approval_denied():
     other = engagement()
     approval = Approval(
         engagement_id=other.id, action="safe_validation",
-        requested_by="tester", approved=True,
+        target="staging.example.org", technique_id="web.headers_review",
+        requested_by="requester", approved_by="reviewer", approved=True,
     )
     with pytest.raises(PolicyDenied):
-        authorize_action(item, "staging.example.org", ActionRisk.ACTIVE, approval)
+        authorize_action(
+            item, "staging.example.org", ActionRisk.ACTIVE,
+            approval, "web.headers_review",
+        )
