@@ -152,6 +152,8 @@ class AuditCollection:
                     event_hash=row.event_hash,
                 ))
         except (ValueError, ValidationError):
+            if engagement_id is not None:
+                return {"valid": False, "event_count": 0, "head_hash": GENESIS_HASH}
             return {
                 "valid": False,
                 "event_count": len(rows),
