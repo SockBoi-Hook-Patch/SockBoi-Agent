@@ -40,5 +40,10 @@
 - Structured outputs and planner evaluation.
 - Model output remains advisory; deterministic policy remains authoritative.
 
+### Android dynamic assessment — design added
+- ADB and Frida Skills are documented in skills/adb-android-device and skills/frida-android-runtime.
+- Live ADB/Frida adapters, isolated Android worker, emulator lifecycle, and runtime evidence persistence remain unimplemented release gates.
+- See [Android Dynamic Assessment](android-dynamic-assessment.md).
+
 ## Release rule
 A feature is not considered implemented until code, tests, documentation, and a verified CI run exist. Roadmap items must not be advertised as working capabilities. See [v0.4 Active Assessment Design](v0.4-active-testing.md) for the execution contract and release gates.
