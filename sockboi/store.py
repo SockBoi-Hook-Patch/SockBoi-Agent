@@ -1,6 +1,8 @@
 """SQLAlchemy-backed persistence for engagement, approval, finding and audit records."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 from collections.abc import Iterator, MutableMapping
 from datetime import UTC, datetime
@@ -22,6 +24,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 
 from .audit import GENESIS_HASH, ChainedEvent, event_hash, verify_chain
@@ -83,30 +86,46 @@ class DatabaseMapping[ModelT](MutableMapping[UUID, ModelT]):
 
 
 class AuditCollection:
-    def __init__(self, engine: Engine, table: Table, chain_table: Table, lock: RLock):
-        self.engine, self.table, self.chain_table, self.lock = engine, table, chain_table, lock
+    def __init__(self, engine: Engine, table: Table, chain_table: Table,
+                 head_table: Table, lock: RLock):
+        self.engine, self.table, self.chain_table = engine, table, chain_table
+        self.head_table, self.lock = head_table, lock
 
     def append(self, event: AuditEvent) -> None:
-        """Persist the event and its hash-chain link in one database transaction."""
+        """Serialize writers across processes using a database-locked singleton head."""
         payload = event.model_dump(mode="json")
-        with self.lock, self.engine.begin() as connection:
-            previous_row = connection.execute(
-                select(self.chain_table.c.sequence, self.chain_table.c.event_hash)
-                .order_by(self.chain_table.c.sequence.desc()).limit(1)
-            ).first()
-            previous_hash = previous_row.event_hash if previous_row else GENESIS_HASH
-            sequence = (previous_row.sequence + 1) if previous_row else 1
-            digest = event_hash(sequence, payload, previous_hash)
-            connection.execute(insert(self.table).values(
-                event_id=str(event.id), engagement_id=str(event.engagement_id),
-                payload=event.model_dump_json(),
-            ))
-            connection.execute(insert(self.chain_table).values(
-                sequence=sequence, event_id=str(event.id),
-                engagement_id=str(event.engagement_id),
-                payload=event.model_dump_json(), previous_hash=previous_hash,
-                event_hash=digest,
-            ))
+        with self.lock, self.engine.connect() as connection:
+            try:
+                if self.engine.dialect.name == "sqlite":
+                    connection.exec_driver_sql("BEGIN IMMEDIATE")
+                else:
+                    connection.begin()
+                head = connection.execute(
+                    select(self.head_table.c.sequence, self.head_table.c.head_hash)
+                    .where(self.head_table.c.id == 1).with_for_update()
+                ).one()
+                sequence = head.sequence + 1
+                previous_hash = head.head_hash
+                digest = event_hash(sequence, payload, previous_hash)
+                connection.execute(insert(self.table).values(
+                    event_id=str(event.id), engagement_id=str(event.engagement_id),
+                    payload=event.model_dump_json(),
+                ))
+                connection.execute(insert(self.chain_table).values(
+                    sequence=sequence, event_id=str(event.id),
+                    engagement_id=str(event.engagement_id),
+                    payload=event.model_dump_json(), previous_hash=previous_hash,
+                    event_hash=digest,
+                ))
+                connection.execute(
+                    update(self.head_table).where(self.head_table.c.id == 1).values(
+                        sequence=sequence, head_hash=digest,
+                    )
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
 
     def verify(self) -> dict:
         """Verify sequence continuity, previous hashes and event digests."""
@@ -131,11 +150,18 @@ class AuditCollection:
                 "event_count": len(rows),
                 "head_hash": rows[-1].event_hash if rows else GENESIS_HASH,
             }
-        valid = verify_chain(events)
+        with self.engine.connect() as connection:
+            head = connection.execute(
+                select(self.head_table.c.sequence, self.head_table.c.head_hash)
+                .where(self.head_table.c.id == 1)
+            ).one()
+        computed_hash = events[-1].event_hash if events else GENESIS_HASH
+        head_matches = head.sequence == len(events) and head.head_hash == computed_hash
         return {
-            "valid": valid,
+            "valid": verify_chain(events) and head_matches,
             "event_count": len(events),
-            "head_hash": events[-1].event_hash if events else GENESIS_HASH,
+            "head_hash": computed_hash,
+            "head_matches": head_matches,
         }
 
     def __iter__(self) -> Iterator[AuditEvent]:
@@ -149,6 +175,11 @@ class AuditCollection:
         with self.lock, self.engine.begin() as connection:
             connection.execute(delete(self.table))
             connection.execute(delete(self.chain_table))
+            connection.execute(
+                update(self.head_table).where(self.head_table.c.id == 1).values(
+                    sequence=0, head_hash=GENESIS_HASH,
+                )
+            )
 
 
 class DatabaseStore:
@@ -181,18 +212,31 @@ class DatabaseStore:
         )
         self.audit_chain_table = Table(
             "audit_chain_events", metadata,
-            Column("sequence", Integer, primary_key=True, autoincrement=True),
+            Column("sequence", Integer, primary_key=True),
             Column("event_id", String(36), unique=True, nullable=False),
             Column("engagement_id", String(36), nullable=False),
             Column("payload", Text, nullable=False),
             Column("previous_hash", String(64), nullable=False),
             Column("event_hash", String(64), nullable=False),
         )
+        self.audit_chain_head_table = Table(
+            "audit_chain_head", metadata,
+            Column("id", Integer, primary_key=True),
+            Column("sequence", Integer, nullable=False),
+            Column("head_hash", String(64), nullable=False),
+        )
         metadata.create_all(self.engine)
+        try:
+            with self.engine.begin() as connection:
+                connection.execute(insert(self.audit_chain_head_table).values(
+                    id=1, sequence=0, head_hash=GENESIS_HASH,
+                ))
+        except IntegrityError:
+            pass
         self.engagements = DatabaseMapping(self.engine, self.engagement_table, Engagement, self.lock)
         self.approvals = DatabaseMapping(self.engine, self.approval_table, Approval, self.lock)
         self.findings = DatabaseMapping(self.engine, self.finding_table, Finding, self.lock)
-        self.audit = AuditCollection(self.engine, self.audit_table, self.audit_chain_table, self.lock)
+        self.audit = AuditCollection(self.engine, self.audit_table, self.audit_chain_table,\n                                     self.audit_chain_head_table, self.lock)
 
     def decide_approval(
         self, approval_id: UUID, approved: bool, reviewer: str,
@@ -265,6 +309,22 @@ class DatabaseStore:
 
     def verify_audit_chain(self) -> dict:
         return self.audit.verify()
+
+    def create_audit_checkpoint(self) -> dict:
+        secret = os.getenv("SOCKBOI_AUDIT_CHECKPOINT_KEY", "")
+        if len(secret) < 32:
+            raise RuntimeError("SOCKBOI_AUDIT_CHECKPOINT_KEY must contain at least 32 characters")
+        verification = self.audit.verify()
+        if not verification["valid"]:
+            raise RuntimeError("audit chain integrity verification failed")
+        checkpoint = {
+            "algorithm": "HMAC-SHA256",
+            "event_count": verification["event_count"],
+            "head_hash": verification["head_hash"],
+        }
+        message = f'{checkpoint["event_count"]}:{checkpoint["head_hash"]}'.encode("utf-8")
+        checkpoint["signature"] = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+        return checkpoint
 
 
 store = DatabaseStore()
