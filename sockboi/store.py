@@ -142,6 +142,7 @@ class AuditCollection:
     def clear(self) -> None:
         with self.lock, self.engine.begin() as connection:
             connection.execute(delete(self.table))
+            connection.execute(delete(self.chain_table))
 
 
 class DatabaseStore:
