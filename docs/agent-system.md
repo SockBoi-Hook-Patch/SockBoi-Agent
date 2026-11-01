@@ -1,38 +1,42 @@
-# SockBoi Agent System (v0.2 roadmap foundation)
+# SockBoi Agent System / ระบบ Agent ของ SockBoi AI
 
-## Current implementation
+## สถานะ v0.3.0
+รุ่นนี้เพิ่มฐานความรู้และ Tool Registry แต่ยังเป็นระบบวางแผน ไม่ใช่ Agent ที่รัน Pentest จริงโดยอัตโนมัติ
 
-The deterministic planner converts an in-scope asset into typed work items assigned to specialist agent roles. It only creates a plan; it does not invoke browsers, scanners, shells, external APIs, or arbitrary tools. Each step records its technique identifier, target, risk, approval requirement, and execution state.
+## บทบาท Agent
+- **SockBoi Core:** ประสานงานและจัดการวงจร Engagement (แผนพัฒนา)
+- **SockBoi Guard:** ตรวจ Scope, Authorization, Approval และ Policy
+- **SockBoi Recon:** วิเคราะห์ Asset Inventory และ Metadata ที่ผู้ใช้ส่งให้ (แผนพัฒนา)
+- **SockBoi Hunter:** วางแผนตรวจ Web Configuration
+- **SockBoi API:** วิเคราะห์ API Schema ที่ผู้ใช้ส่งให้
+- **SockBoi Network:** วิเคราะห์ Network Inventory ที่ผู้ใช้ส่งให้ โดยไม่สแกนพอร์ต
+- **SockBoi Analyst:** ตรวจสอบความครบถ้วนและ Integrity ของ Evidence
+- **SockBoi Report:** สร้างรายงาน (แผนพัฒนา)
 
-## Agent roles
+## Knowledge Layer
+Endpoint `POST /knowledge/ingest` รับ Markdown สูงสุด 256 KB ต่อเอกสาร และคำนวณ SHA-256 เพื่อระบุเนื้อหา เอกสารค้นหาได้ผ่าน `GET /knowledge/search` ด้วย lexical keyword scoring
 
-- **SockBoi Core:** orchestration and lifecycle management (planned).
-- **SockBoi Guard:** scope, authorization, approval, and policy enforcement.
-- **SockBoi Recon:** asset inventory and supplied metadata analysis (planned).
-- **SockBoi Hunter:** web configuration and application review (approval-gated adapter planned).
-- **SockBoi API:** schema and API design review (planned).
-- **SockBoi Network:** review of operator-supplied service inventories (planned).
-- **SockBoi Analyst:** evidence integrity, confidence, and finding verification (planned).
-- **SockBoi Report:** report generation (planned).
+**ข้อกำหนดสำคัญ:** เนื้อหาที่นำเข้าทั้งหมดเป็น Untrusted Reference Data ไม่ใช่ System Prompt หรือคำสั่ง Tool และไม่สามารถแก้ Scope, Policy หรือ Approval ได้ รุ่นนี้ยังไม่มีการดึงข้อมูลจาก Git repository โดยตรง
 
-## Technique catalog
+## Typed Tool Registry
+`GET /tools` แสดงรายการเครื่องมือพร้อม JSON input schema ได้แก่:
+- `knowledge.search`
+- `evidence.sha256`
+- `scope.inspect`
 
-The initial catalog includes scope inventory, supplied API schema review, HTTP security-header review, TLS configuration review, supplied network inventory review, and evidence integrity verification. The catalog is deliberately declarative: a technique description is not executable code.
+รายการเหล่านี้เป็น Catalog เท่านั้น `execution_enabled=false` ทุกตัว ไม่มี generic shell หรือ arbitrary MCP invocation
 
-## Autonomy model
+## Approval Model
+Approval ระบุ Engagement, Target, Technique ID และผู้ร้องขอ การอนุมัติ Active/State-changing ต้อง:
+1. Target อยู่ใน Scope แบบ deterministic
+2. Approval เป็นของ Engagement เดียวกัน
+3. Target ตรงกับ Approval แบบ exact match
+4. Technique ID ตรงกับ Approval
+5. ผู้อนุมัติไม่ใช่ผู้ร้องขอ
+6. Approval ยังไม่หมดอายุ
 
-1. The planner may create a proposed plan for an explicitly scoped asset.
-2. Passive analysis of user-supplied material may be marked as not requiring active-test approval.
-3. Any network interaction or state-changing test must go through a separately implemented adapter and the central policy gate.
-4. Active steps require an approval bound to the engagement, target, technique, and expiry before execution. This foundation does not yet implement adapter execution.
-5. The model cannot add scope, grant approvals, or change policy.
+## Evidence Integrity
+`POST /evidence/hash` คืน SHA-256 digest ของข้อความที่ส่งมาเท่านั้น ไม่บันทึก raw evidence ลง Store
 
-## Next engineering milestones
-
-- Persist plans and task state in PostgreSQL with tenant isolation.
-- Add authenticated users, roles, and approval identity.
-- Bind approvals to exact targets and technique IDs, with expiry and revocation.
-- Add read-only evidence import and SHA-256 integrity metadata.
-- Add sandboxed browser/ZAP adapters with egress allowlists and rate limits.
-- Add skill retrieval with provenance, content validation, and prompt-injection isolation.
-- Add evaluation datasets and regression tests for planner quality.
+## ข้อจำกัด
+Knowledge Library และ Store เป็น In-memory; ไม่มี Authentication, RBAC, Tenant Isolation, PostgreSQL, MCP Runtime, Browser/ZAP Adapter หรือ LLM Runtime ในรุ่นนี้
