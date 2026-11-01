@@ -252,3 +252,15 @@ def test_knowledge_ingestion_and_search_are_tenant_scoped():
         "source": "reader.md", "content": "# Reader cannot ingest",
     })
     assert reader_cannot_ingest.status_code == 403
+
+
+def test_malformed_api_keyring_fails_closed(monkeypatch):
+    monkeypatch.setenv("SOCKBOI_API_KEYS", "{not-json")
+    response = TestClient(app).get("/engagements")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "API key configuration is invalid"
+
+    monkeypatch.setenv("SOCKBOI_API_KEYS", "{}")
+    response = TestClient(app).get("/engagements")
+    assert response.status_code == 503
+    assert response.json()["detail"] == "API key configuration is invalid"
