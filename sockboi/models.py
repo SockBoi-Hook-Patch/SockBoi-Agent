@@ -50,6 +50,7 @@ class EngagementCreate(BaseModel):
 
 
 class Engagement(EngagementCreate):
+    tenant_id: str = "default"
     id: UUID = Field(default_factory=uuid4)
     status: EngagementStatus = EngagementStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
