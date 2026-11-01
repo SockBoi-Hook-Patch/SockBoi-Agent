@@ -28,6 +28,10 @@ class SkillIngestRequest(BaseModel):
     content: str = Field(min_length=1)
 
 
+class EvidenceHashRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=256000)
+
+
 class ApprovalRequest(BaseModel):
     action: str = Field(min_length=3, max_length=120)
     target: str = Field(min_length=1, max_length=253)
@@ -186,8 +190,8 @@ def get_tool_catalog() -> dict:
 
 
 @app.post("/evidence/hash")
-def hash_evidence(content: str) -> dict:
-    return {"algorithm": "SHA-256", "sha256": sha256_hex(content),
+def hash_evidence(payload: EvidenceHashRequest) -> dict:
+    return {"algorithm": "SHA-256", "sha256": sha256_hex(payload.content),
             "stored": False, "note": "Only a digest is returned; evidence content is not persisted."}
 
 
