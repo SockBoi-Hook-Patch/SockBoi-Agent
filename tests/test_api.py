@@ -158,3 +158,23 @@ def test_approval_is_bound_to_exact_action_and_consumed_once():
         },
     )
     assert replay.status_code == 403
+
+
+def test_audit_chain_verification_endpoint_requires_reviewer():
+    created = client.post("/engagements", json={
+        "name": "Audit verification lab",
+        "authorization_ref": "ROE-AUDIT-VERIFY",
+        "owner": "ignored@example.org",
+        "scope": [{"kind": "domain", "value": "audit.example.test"}],
+    })
+    assert created.status_code == 201
+    engagement_id = created.json()["id"]
+
+    reviewer = TestClient(app, headers={"Authorization": "Bearer reviewer-key"})
+    verified = reviewer.get(f"/engagements/{engagement_id}/audit/verify")
+    assert verified.status_code == 200
+    assert verified.json()["valid"] is True
+    assert verified.json()["event_count"] >= 1
+
+    forbidden = client.get(f"/engagements/{engagement_id}/audit/verify")
+    assert forbidden.status_code == 403
