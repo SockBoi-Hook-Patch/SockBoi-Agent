@@ -19,9 +19,9 @@ from .models import (
     FindingCreate,
 )
 from .policy import PolicyDenied, asset_matches, authorize_action
+from .security import authenticate_api_key, load_keyring
 from .store import store
 from .tool_registry import list_tools
-from .security import authenticate_api_key, load_keyring
 
 app = FastAPI(
     title="SockBoi Agent",
