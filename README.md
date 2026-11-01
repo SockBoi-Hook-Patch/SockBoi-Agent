@@ -87,7 +87,11 @@ uvicorn sockboi.main:app --reload
 - [ ] LLM Planner Provider และ Evaluation Suite
 - [ ] Evidence Store และ Report Generator
 
-## Product Architecture\n\nSockBoi Agent is organized into three modular layers: **Agent Core** (orchestration), **Skills** (versioned assessment playbooks), and **MCP** (typed integrations). The deterministic Policy Engine remains the authorization authority. See [Agent](agent/README.md), [Skills](skills/README.md), [MCP](mcp/README.md), and [Roadmap](docs/roadmap.md).\n\n## English
+## Product Architecture
+
+SockBoi Agent is organized into three modular layers: **Agent Core** (orchestration), **Skills** (versioned assessment playbooks), and **MCP** (typed integrations). The deterministic Policy Engine remains the authorization authority. See [Agent](agent/README.md), [Skills](skills/README.md), [MCP](mcp/README.md), and [Roadmap](docs/roadmap.md).
+
+## English
 
 ### Overview
 SockBoi Agent is a developer-preview control plane for authorized security assessments. It coordinates specialist-agent planning while keeping scope and approval decisions in a deterministic policy layer.
