@@ -89,7 +89,8 @@ def test_approval_is_bound_to_exact_action_and_consumed_once():
     assert requested.status_code == 201
     approval_id = requested.json()["id"]
 
-    decision = client.post(f"/approvals/{approval_id}/decide", params={"approved": "true"})
+    reviewer = TestClient(app, headers={"Authorization": "Bearer reviewer-key"})
+    decision = reviewer.post(f"/approvals/{approval_id}/decide", params={"approved": "true"})
     assert decision.status_code == 200
     assert decision.json()["expires_at"] is not None
 
