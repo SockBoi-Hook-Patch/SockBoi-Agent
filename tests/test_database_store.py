@@ -128,7 +128,7 @@ def test_audit_checkpoint_is_signed_and_requires_external_secret(tmp_path, monke
     expected = hmac.new(
         ("test-checkpoint-secret-" + "x" * 32).encode(), message, hashlib.sha256,
     ).hexdigest()
-    assert hmac.compare_digest(checkpoint["signature"], expected)
+    assert hmac.compare_digest(checkpoint["mac"], expected)
 
 
 def test_audit_head_initializes_from_existing_chain_on_upgrade(tmp_path):
