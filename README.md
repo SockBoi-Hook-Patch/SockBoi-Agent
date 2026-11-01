@@ -192,3 +192,12 @@ Contributions are welcome, especially improvements to correctness, tests, docume
 ## License
 
 The repository currently declares MIT in package metadata. Review the repository's license file and distribution terms before reuse.
+
+## AI-assisted development
+
+This project is developed and maintained by its human project owner. AI tools are used as development aids:
+
+- **ChatGPT (OpenAI):** used for technical discussion, planning, code/documentation review, and drafting assistance.
+- **OpenAI Codex:** used for coding assistance, repository changes, and development workflows.
+
+AI-generated suggestions are reviewed and validated by the project maintainer. These tools are acknowledged as development assistance, not as GitHub contributors, project owners, or substitutes for human responsibility.
