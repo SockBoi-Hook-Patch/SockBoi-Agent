@@ -67,3 +67,68 @@ def test_api_requires_bearer_key_and_isolates_tenants():
         "scope": [{"kind": "domain", "value": "reader.example.test"}],
     })
     assert denied.status_code == 403
+
+
+def test_approval_is_bound_to_exact_action_and_consumed_once():
+    created = client.post("/engagements", json={
+        "name": "Approval binding lab",
+        "authorization_ref": "ROE-APPROVAL-1",
+        "owner": "ignored@example.org",
+        "scope": [{"kind": "domain", "value": "approval.example.test"}],
+    })
+    assert created.status_code == 201
+    engagement_id = created.json()["id"]
+    requested = client.post(f"/engagements/{engagement_id}/approvals", json={
+        "action": "inspect-http-security-headers",
+        "target": "approval.example.test",
+        "technique_id": "headers.get",
+        "adapter_id": "http.inspect",
+        "parameters": {"timeout": 3, "max_bytes": 4096},
+        "risk": "active",
+    })
+    assert requested.status_code == 201
+    approval_id = requested.json()["id"]
+
+    decision = client.post(f"/approvals/{approval_id}/decide", params={"approved": "true"})
+    assert decision.status_code == 200
+    assert decision.json()["expires_at"] is not None
+
+    changed_action = client.post(
+        f"/approvals/{approval_id}/consume",
+        params={"engagement_id": engagement_id},
+        json={
+            "target": "approval.example.test",
+            "technique_id": "headers.get",
+            "adapter_id": "http.inspect",
+            "parameters": {"timeout": 30, "max_bytes": 4096},
+            "risk": "active",
+        },
+    )
+    assert changed_action.status_code == 403
+
+    consumed = client.post(
+        f"/approvals/{approval_id}/consume",
+        params={"engagement_id": engagement_id},
+        json={
+            "target": "approval.example.test",
+            "technique_id": "headers.get",
+            "adapter_id": "http.inspect",
+            "parameters": {"timeout": 3, "max_bytes": 4096},
+            "risk": "active",
+        },
+    )
+    assert consumed.status_code == 200
+    assert consumed.json()["consumed"] is True
+
+    replay = client.post(
+        f"/approvals/{approval_id}/consume",
+        params={"engagement_id": engagement_id},
+        json={
+            "target": "approval.example.test",
+            "technique_id": "headers.get",
+            "adapter_id": "http.inspect",
+            "parameters": {"timeout": 3, "max_bytes": 4096},
+            "risk": "active",
+        },
+    )
+    assert replay.status_code == 403
