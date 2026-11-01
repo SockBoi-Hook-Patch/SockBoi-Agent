@@ -205,7 +205,7 @@ python -c "import secrets,hashlib; k=secrets.token_urlsafe(32); print('API_KEY='
 ]
 ```
 
-ตั้งค่า Environment Variable ก่อนเปิด Server
+หากต้องการใช้ Audit Checkpoint ให้สร้าง Secret แยกต่างหากด้วย `python -c "import secrets; print(secrets.token_urlsafe(48))"` แล้วตั้งค่า `SOCKBOI_AUDIT_CHECKPOINT_KEY` เก็บไว้ภายนอก Git และ Database\n\nตั้งค่า Environment Variable ก่อนเปิด Server
 
 Linux / macOS:
 
@@ -383,8 +383,10 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 | POST | `/policy/check` | ตรวจ Scope, Risk และ Approval |
 | POST | `/findings` | สร้าง Finding (admin/operator) |
 | GET | `/engagements/{id}/audit` | อ่าน Audit Events ของ Engagement |
-| POST | `/knowledge/ingest` | นำเข้า Markdown เป็น Untrusted Knowledge |
-| GET | `/knowledge/search?query=...` | ค้นหา Knowledge |
+| GET | `/engagements/{id}/audit/verify` | ตรวจสอบ Audit Chain ของ Engagement (admin/reviewer) |
+| GET | `/engagements/{id}/audit/checkpoint` | สร้าง HMAC checkpoint สำหรับส่งไปเก็บภายนอก (admin/reviewer) |
+| POST | `/knowledge/ingest` | นำเข้า Markdown แบบ Tenant-scoped (admin/operator) |
+| GET | `/knowledge/search?query=...` | ค้นหา Knowledge ภายใน Tenant ของผู้เรียก |
 | GET | `/tools` | ดู Typed Tool Catalog (execution disabled) |
 | POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |
 
@@ -399,7 +401,8 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 - ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง
 - Approval Consume เป็นการใช้สิทธิ์ ไม่ใช่การรัน Network Action
 - Database schema ใช้ SQLAlchemy `create_all`; ยังไม่มี Alembic migration workflow
-- ยังต้องทบทวน hardening เช่น approval decision immutability/revocation, actor binding สำหรับการ consume, parameter schema allowlist และการทดสอบขอบเขตเพิ่มเติม
+- ยังไม่มี Alembic migrations, automatic external checkpoint export, approval revocation endpoint หรือ PostgreSQL multi-process integration tests
+- ยังต้องทำ production security review, parameter schema allowlist และ hardening ของ deployment ก่อนเปิด execution
 - ยังไม่ผ่านการรับรอง Production Security Review
 
 ### Roadmap
@@ -428,12 +431,13 @@ It is not an unrestricted exploitation framework. The deterministic Policy Engin
 
 - FastAPI service with Bearer API-key authentication (SHA-256 digests stored in server configuration).
 - Role-based access checks for selected operations.
-- Tenant-scoped engagement access; tenant identity is derived from the authenticated principal.
+- Tenant-scoped engagement and knowledge access; tenant identity is derived from the authenticated principal.
 - SQLAlchemy-backed records for engagements, approvals, findings, and audit events.
 - Scope-aware assessment planning.
 - Action-bound approval digests covering engagement, tenant, target, adapter, technique, parameters, and risk.
 - One-time approval consumption with expiry and database conditional update; consumption does not execute the approved action.
 - Tenant-scoped Markdown knowledge ingestion and keyword search; imported content is untrusted reference data.
+- SHA-256 hash-chain audit records with engagement-scoped verification and HMAC checkpoint export.
 - Typed tool catalogue with execution disabled.
 - Finding management, audit event retrieval, and SHA-256 evidence digest calculation without content persistence.
 
@@ -450,7 +454,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Configure `SOCKBOI_API_KEYS` as a JSON array containing `key_sha256`, `subject`, `tenant_id`, and `roles`. See the Thai authentication section above for key generation and configuration examples.
+Configure `SOCKBOI_API_KEYS` as a JSON array containing `key_sha256`, `subject`, `tenant_id`, and `roles`. For checkpoint export, also set `SOCKBOI_AUDIT_CHECKPOINT_KEY` to a randomly generated secret of at least 32 characters; keep it outside source control. See the Thai authentication section above for configuration examples.
 
 Start the API:
 
