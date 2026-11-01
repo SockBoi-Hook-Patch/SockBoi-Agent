@@ -194,3 +194,34 @@ def test_audit_checkpoint_endpoint_requires_reviewer_and_returns_signature():
     assert response.status_code == 200
     assert response.json()["algorithm"] == "HMAC-SHA256"
     assert len(response.json()["signature"]) == 64
+
+
+def test_audit_verification_and_checkpoint_are_engagement_scoped():
+    first = client.post("/engagements", json={
+        "name": "Scoped audit one", "authorization_ref": "ROE-SCOPE-1",
+        "owner": "ignored@example.org",
+        "scope": [{"kind": "domain", "value": "one.audit.example.test"}],
+    })
+    second = client.post("/engagements", json={
+        "name": "Scoped audit two", "authorization_ref": "ROE-SCOPE-2",
+        "owner": "ignored@example.org",
+        "scope": [{"kind": "domain", "value": "two.audit.example.test"}],
+    })
+    assert first.status_code == second.status_code == 201
+    first_id, second_id = first.json()["id"], second.json()["id"]
+    reviewer = TestClient(app, headers={"Authorization": "Bearer reviewer-key"})
+
+    before = reviewer.get(f"/engagements/{first_id}/audit/checkpoint").json()
+    assert before["engagement_id"] == first_id
+    assert before["event_count"] == 1
+
+    # An event in another engagement must not alter this engagement's checkpoint.
+    other_event = client.post(f"/engagements/{second_id}/plan",
+                              params={"target": "two.audit.example.test"})
+    assert other_event.status_code == 200
+    after = reviewer.get(f"/engagements/{first_id}/audit/checkpoint").json()
+    assert after == before
+
+    scoped_verify = reviewer.get(f"/engagements/{first_id}/audit/verify").json()
+    assert scoped_verify["event_count"] == 1
+    assert "head_matches" not in scoped_verify
