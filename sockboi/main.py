@@ -143,7 +143,7 @@ def get_engagement(engagement_id: UUID, request: Request) -> Engagement:
 
 @app.post("/engagements/{engagement_id}/plan", response_model=AssessmentPlan)
 def create_agent_plan(engagement_id: UUID, target: str, request: Request) -> AssessmentPlan:
-    _get_engagement(engagement_id, request)
+    engagement = _get_engagement(engagement_id, request)
     try:
         plan = build_plan(engagement, target)
     except ValueError as exc:
@@ -345,7 +345,7 @@ async def inspect_apk(
 ) -> dict:
     """Inspect an uploaded APK as an untrusted ZIP; never extracts or executes it."""
     _require_role(request, "admin", "operator")
-    engagement = _get_engagement(engagement_id, request)
+    _get_engagement(engagement_id, request)
     payload = bytearray()
     try:
         while chunk := await file.read(1024 * 1024):
