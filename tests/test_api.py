@@ -179,3 +179,18 @@ def test_audit_chain_verification_endpoint_requires_reviewer():
     reader = TestClient(app, headers={"Authorization": "Bearer tenant-b-key"})
     forbidden = reader.get(f"/engagements/{engagement_id}/audit/verify")
     assert forbidden.status_code == 403
+
+
+def test_audit_checkpoint_endpoint_requires_reviewer_and_returns_signature():
+    created = client.post("/engagements", json={
+        "name": "Checkpoint lab", "authorization_ref": "ROE-CHECKPOINT",
+        "owner": "ignored@example.org",
+        "scope": [{"kind": "domain", "value": "checkpoint.example.test"}],
+    })
+    assert created.status_code == 201
+    engagement_id = created.json()["id"]
+    reviewer = TestClient(app, headers={"Authorization": "Bearer reviewer-key"})
+    response = reviewer.get(f"/engagements/{engagement_id}/audit/checkpoint")
+    assert response.status_code == 200
+    assert response.json()["algorithm"] == "HMAC-SHA256"
+    assert len(response.json()["signature"]) == 64
