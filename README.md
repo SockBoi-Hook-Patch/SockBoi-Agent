@@ -433,7 +433,7 @@ It is not an unrestricted exploitation framework. The deterministic Policy Engin
 - Scope-aware assessment planning.
 - Action-bound approval digests covering engagement, tenant, target, adapter, technique, parameters, and risk.
 - One-time approval consumption with expiry and database conditional update; consumption does not execute the approved action.
-- Markdown knowledge ingestion and keyword search; imported content is untrusted reference data.
+- Tenant-scoped Markdown knowledge ingestion and keyword search; imported content is untrusted reference data.
 - Typed tool catalogue with execution disabled.
 - Finding management, audit event retrieval, and SHA-256 evidence digest calculation without content persistence.
 
