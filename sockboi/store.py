@@ -137,8 +137,41 @@ class DatabaseStore:
         self.findings = DatabaseMapping(self.engine, self.finding_table, Finding, self.lock)
         self.audit = AuditCollection(self.engine, self.audit_table, self.lock)
 
-    def consume_approval(self, approval_id: UUID, envelope_sha256: str) -> Approval:
-        """Atomically consume one approved grant using compare-and-swap on its stored payload."""
+    def decide_approval(
+        self, approval_id: UUID, approved: bool, reviewer: str,
+        expires_at: datetime | None,
+    ) -> Approval:
+        """Record exactly one reviewer decision using a database compare-and-swap."""
+        with self.lock, self.engine.begin() as connection:
+            row = connection.execute(
+                select(self.approval_table.c.payload).where(
+                    self.approval_table.c.id == str(approval_id)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                raise KeyError(approval_id)
+            item = Approval.model_validate_json(row)
+            if item.approved_by is not None or item.consumed:
+                raise PermissionError("approval decision is immutable")
+            if approved and item.requested_by == reviewer:
+                raise PermissionError("requester cannot approve their own request")
+            updated = item.model_copy(update={
+                "approved": approved, "approved_by": reviewer, "expires_at": expires_at,
+            })
+            result = connection.execute(
+                update(self.approval_table)
+                .where(self.approval_table.c.id == str(approval_id))
+                .where(self.approval_table.c.payload == row)
+                .values(payload=updated.model_dump_json())
+            )
+            if result.rowcount != 1:
+                raise PermissionError("approval was concurrently decided")
+            return updated
+
+    def consume_approval(
+        self, approval_id: UUID, envelope_sha256: str, actor: str,
+    ) -> Approval:
+        """Atomically consume a one-time grant for its original requester only."""
         with self.lock, self.engine.begin() as connection:
             row = connection.execute(
                 select(self.approval_table.c.payload).where(
@@ -150,6 +183,8 @@ class DatabaseStore:
             item = Approval.model_validate_json(row)
             if not item.approved or item.consumed:
                 raise PermissionError("approval is not available for consumption")
+            if item.requested_by != actor:
+                raise PermissionError("only the original requester may consume this approval")
             if item.envelope_sha256 != envelope_sha256:
                 raise PermissionError("approval does not match the requested action envelope")
             if item.requested_by == item.approved_by:
