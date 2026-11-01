@@ -507,3 +507,6 @@ Audit events are now persisted with a SHA-256 hash-chain record and can be check
 
 
 The audit verification endpoint requires an authenticated principal with the `reviewer` or `admin` role and a tenant-owned engagement identifier.
+
+
+Verification reports the chain validity, number of chained audit events, and current head digest; it does not repair or rewrite a damaged chain.
