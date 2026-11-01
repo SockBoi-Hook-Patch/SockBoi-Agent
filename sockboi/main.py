@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException
 
 from . import __version__
+from .agents.planner import AssessmentPlan, build_plan
 from .models import (
     ActionRisk, Approval, AuditEvent, Engagement, EngagementCreate,
     Finding, FindingCreate,
@@ -14,7 +15,7 @@ from .store import store
 app = FastAPI(
     title="SockBoi AI",
     version=__version__,
-    description="Policy-first control plane foundation for authorized security assessments.",
+    description="Policy-first multi-agent planning foundation for authorized security assessments.",
 )
 
 
@@ -45,6 +46,27 @@ def get_engagement(engagement_id: UUID) -> Engagement:
     if item is None:
         raise HTTPException(404, "engagement not found")
     return item
+
+
+@app.post("/engagements/{engagement_id}/plan", response_model=AssessmentPlan)
+def create_agent_plan(engagement_id: UUID, target: str) -> AssessmentPlan:
+    engagement = store.engagements.get(engagement_id)
+    if engagement is None:
+        raise HTTPException(404, "engagement not found")
+    try:
+        plan = build_plan(engagement, target)
+    except ValueError as exc:
+        store.log(AuditEvent(
+            engagement_id=engagement_id, event_type="agent.plan.denied",
+            actor="api", detail={"target": target, "reason": str(exc)},
+        ))
+        raise HTTPException(403, str(exc)) from exc
+    store.log(AuditEvent(
+        engagement_id=engagement_id, event_type="agent.plan.created",
+        actor="api", detail={"plan_id": str(plan.plan_id), "target": target,
+                             "steps": len(plan.steps)},
+    ))
+    return plan
 
 
 @app.post("/engagements/{engagement_id}/approvals", response_model=Approval, status_code=201)
