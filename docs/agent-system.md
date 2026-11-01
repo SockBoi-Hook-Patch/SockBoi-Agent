@@ -1,4 +1,4 @@
-# SockBoi Agent System / ระบบ Agent ของ SockBoi AI
+# SockBoi Agent System / ระบบ Agent ของ SockBoi Agent
 
 ## สถานะ v0.3.0
 รุ่นนี้เพิ่มฐานความรู้และ Tool Registry แต่ยังเป็นระบบวางแผน ไม่ใช่ Agent ที่รัน Pentest จริงโดยอัตโนมัติ
