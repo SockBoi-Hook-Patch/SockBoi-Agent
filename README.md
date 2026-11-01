@@ -517,11 +517,11 @@ The audit verification operation is read-only and does not change engagement sta
 Audit verification is an integrity check, not a substitute for protected backups, database access controls, or independently retained checkpoints.
 
 
-### Concurrent audit writers and signed checkpoints
+### Concurrent audit writers and HMAC-authenticated checkpoints
 
 Audit appends serialize through a singleton database head row. PostgreSQL uses row-level locking (`SELECT ... FOR UPDATE`); SQLite obtains a write reservation with `BEGIN IMMEDIATE`. The event, chain link, and updated head are committed in one transaction. Verification checks the global integrity internally, then returns only a deterministic engagement-scoped event count and derived head hash to the authorized caller.
 
-Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at least 32 characters. The reviewer/admin-only endpoint `GET /engagements/{engagement_id}/audit/checkpoint` returns an HMAC-SHA256 message authentication code (MAC) bound to the engagement ID, its event count, and its derived head hash. Export the checkpoint (event count, head hash, algorithm, signature) to independently controlled immutable storage or a separate signing service. Keep the secret outside the application database and restrict access to it. A checkpoint is useful only if retained independently; a database administrator who can replace both the chain and its in-database head must not also control the external checkpoint and signing key.
+Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at least 32 characters. The reviewer/admin-only endpoint `GET /engagements/{engagement_id}/audit/checkpoint` returns an HMAC-SHA256 message authentication code (MAC) bound to the engagement ID, its event count, and its derived head hash. Export the checkpoint (engagement ID, event count, head hash, algorithm, MAC) to independently controlled immutable storage or a separate key-management service. Keep the secret outside the application database and restrict access to it. A checkpoint is useful only if retained independently; a database administrator who can replace both the chain and its in-database head must not also control the external checkpoint and signing key.
 
 The checkpoint endpoint signs the current verified head; it does not automatically transmit or retain checkpoints externally. Operators must export and preserve the returned record. Production PostgreSQL concurrency behavior and checkpoint retention/rotation still require deployment-specific integration tests and operational procedures.
 
