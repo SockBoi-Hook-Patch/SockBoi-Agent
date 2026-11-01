@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sockboi-ai"
-version = "0.1.0"
-description = "Policy-first orchestration foundation for authorized security assessments"
+version = "0.2.0"
+description = "Policy-first multi-agent planning foundation for authorized security assessments"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
