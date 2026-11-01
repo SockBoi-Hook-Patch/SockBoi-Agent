@@ -23,7 +23,9 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 
-from .audit import GENESIS_HASH, event_hash, verify_chain
+from pydantic import ValidationError
+
+from .audit import ChainedEvent, GENESIS_HASH, event_hash, verify_chain
 from .models import Approval, AuditEvent, Engagement, Finding
 
 
@@ -115,8 +117,6 @@ class AuditCollection:
                        self.chain_table.c.previous_hash, self.chain_table.c.event_hash)
                 .order_by(self.chain_table.c.sequence)
             ).all()
-        from .audit import ChainedEvent
-        from pydantic import ValidationError
         events = []
         try:
             for row in rows:
