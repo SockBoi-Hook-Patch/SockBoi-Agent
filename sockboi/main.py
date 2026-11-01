@@ -1,4 +1,4 @@
-"""SockBoi AI HTTP API."""
+"""SockBoi Agent HTTP API."""
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
@@ -17,9 +17,9 @@ from .store import store
 from .tool_registry import list_tools
 
 app = FastAPI(
-    title="SockBoi AI",
+    title="SockBoi Agent",
     version=__version__,
-    description="Policy-first multi-agent planning and knowledge foundation for authorized security assessments.",
+    description="Modular Agent + Skills + MCP platform for authorized security assessments.",
 )
 
 
@@ -41,7 +41,7 @@ class ApprovalRequest(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "sockboi-ai", "version": __version__}
+    return {"status": "ok", "service": "sockboi-agent", "version": __version__}
 
 
 @app.post("/engagements", response_model=Engagement, status_code=201)
