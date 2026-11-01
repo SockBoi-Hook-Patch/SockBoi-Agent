@@ -2,6 +2,8 @@ services:
   api:
     build: .
     env_file: .env
+    environment:
+      SOCKBOI_DATABASE_URL: postgresql+psycopg://sockboi:${POSTGRES_PASSWORD:-local-dev-only-change-me}@db:5432/sockboi
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
