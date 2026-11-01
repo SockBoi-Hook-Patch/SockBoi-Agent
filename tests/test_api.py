@@ -181,7 +181,7 @@ def test_audit_chain_verification_endpoint_requires_reviewer():
     assert forbidden.status_code == 403
 
 
-def test_audit_checkpoint_endpoint_requires_reviewer_and_returns_signature():
+def test_audit_checkpoint_endpoint_requires_reviewer_and_returns_mac():
     created = client.post("/engagements", json={
         "name": "Checkpoint lab", "authorization_ref": "ROE-CHECKPOINT",
         "owner": "ignored@example.org",
@@ -193,7 +193,7 @@ def test_audit_checkpoint_endpoint_requires_reviewer_and_returns_signature():
     response = reviewer.get(f"/engagements/{engagement_id}/audit/checkpoint")
     assert response.status_code == 200
     assert response.json()["algorithm"] == "HMAC-SHA256"
-    assert len(response.json()["signature"]) == 64
+    assert len(response.json()["mac"]) == 64
 
 
 def test_audit_verification_and_checkpoint_are_engagement_scoped():
