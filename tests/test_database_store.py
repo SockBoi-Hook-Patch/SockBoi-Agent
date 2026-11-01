@@ -115,3 +115,23 @@ def test_audit_checkpoint_is_signed_and_requires_external_secret(tmp_path, monke
     checkpoint = database.create_audit_checkpoint()
     assert checkpoint["algorithm"] == "HMAC-SHA256"
     assert len(checkpoint["signature"]) == 64
+
+
+def test_audit_head_initializes_from_existing_chain_on_upgrade(tmp_path):
+    database_url = "sqlite+pysqlite:///" + str(tmp_path / "upgrade-chain.db")
+    first = DatabaseStore(database_url)
+    first.log(AuditEvent(
+        engagement_id=__import__("uuid").uuid4(),
+        event_type="before.head.migration", actor="operator",
+    ))
+    first.audit_chain_head_table.drop(first.engine)
+
+    upgraded = DatabaseStore(database_url)
+    assert upgraded.verify_audit_chain()["valid"] is True
+    upgraded.log(AuditEvent(
+        engagement_id=__import__("uuid").uuid4(),
+        event_type="after.head.migration", actor="operator",
+    ))
+    result = upgraded.verify_audit_chain()
+    assert result["valid"] is True
+    assert result["event_count"] == 2
