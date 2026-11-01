@@ -1,51 +1,47 @@
-# Architecture
+# Architecture / สถาปัตยกรรม
 
 ## Design
-
-SockBoi AI is intended to be a control plane, not an autonomous unrestricted exploit runner.
+SockBoi AI เป็น Control Plane สำหรับประเมินความปลอดภัยที่ได้รับอนุญาต ไม่ใช่ Unrestricted Exploit Runner
 
 ```text
 Dashboard / API
       |
 Engagement & Authorization
       |
-Central Policy Gate ---- Audit Log
+Deterministic Policy Gate ---- Audit Log
       |
-Typed Tool Adapters (planned)
-  |        |         |
-Browser   ZAP      MCP Skills
+Multi-Agent Planner ---- Untrusted Knowledge Library
       |
-Evidence Store (planned)
+Typed Tool Registry (catalog only; execution disabled)
       |
-Analyst Review & Report (planned)
+Approval Checkpoint (engagement + target + technique)
+      |
+Evidence SHA-256 utility (digest only; no persistence)
 ```
 
 ## Non-negotiable boundaries
+1. Engagement ต้องมี Authorization Reference และ Asset Scope ที่ระบุชัด
+2. Scope Check ทำงานแบบ deterministic และไม่ขึ้นกับผลลัพธ์ LLM
+3. Tool Registry ใช้ Typed Schema; รุ่นนี้ยังไม่เปิด execution
+4. Active Action ต้องมี Approval ที่ยังไม่หมดอายุและผูกกับ Engagement, Target, Technique
+5. ผู้ร้องขออนุมัติไม่สามารถอนุมัติคำขอของตัวเอง
+6. Skill, Markdown, Web Content และ Model Output เป็น Untrusted Data ไม่สามารถสั่ง Orchestrator หรือแก้ Policy
+7. ไม่มี Arbitrary Shell, Reverse Shell, Persistence, Credential Theft หรือ DoS
 
-1. Engagements require an authorization reference and explicit assets.
-2. Scope checks are deterministic and independent of LLM output.
-3. Tool adapters accept typed arguments and enforce allowlists.
-4. Active actions require an unexpired, engagement-bound approval.
-5. Imported skill documents and web content are untrusted data; they cannot issue instructions to the orchestrator.
-6. No arbitrary shell, raw script execution, reverse shell, persistence, credential theft, or denial-of-service capability is provided.
+## Current implementation
+- FastAPI API, explicit scope models, deterministic planner
+- Markdown ingestion สูงสุด 256 KB และ lexical retrieval ใน memory
+- Static typed tool catalogue (ไม่ execute)
+- Approval binding และ SHA-256 digest endpoint
+- In-memory engagement, approval, finding, audit และ knowledge data
 
-## Current implementation limits
+## Limitations
+ยังไม่มี Authentication, RBAC, Tenant Isolation, PostgreSQL persistence, MCP Runtime, Browser/ZAP execution หรือ LLM Provider การตั้งค่า Docker database ยังไม่เชื่อมกับ application store ห้ามใช้ Production
 
-The current store is process-local memory. API endpoints have no user authentication. The Compose database and Redis are development dependencies only and are not wired into the store. There are no functioning scanner, browser, MCP, LLM, or evidence-storage adapters in this version.
-
-## Planned execution lifecycle
-
-Authorization -> scope validation -> passive discovery -> asset inventory -> skill retrieval -> test plan -> approval checkpoint -> constrained adapter -> evidence capture -> analyst verification -> report.
-
-## Planned advanced techniques
-
-- Hybrid knowledge retrieval (BM25 + embeddings) with source provenance.
-- Progressive skill loading to avoid dumping entire repositories into model context.
-- Differential web/API testing with rate limits and explicit test accounts.
-- Browser-based authenticated test flows isolated per engagement.
-- Passive TLS, HTTP security-header, and endpoint configuration review.
-- Evidence integrity hashes and reproducible finding records.
-- Attack-surface graph and relationship-based prioritization.
-- Confidence scoring that separates observed facts from hypotheses.
-
-These are roadmap items, not claims of implemented functionality.
+## Roadmap
+- PostgreSQL + migrations + transactional persistence
+- Authenticated users, RBAC, tenant isolation
+- MCP adapters แบบ allowlist พร้อม policy enforcement
+- Browser/ZAP sandbox, egress allowlist, rate limits
+- LLM planner ที่เสนอแผนเท่านั้น โดย Policy Engine เป็นผู้ตัดสิน
+- Evidence storage, report generation และ evaluation suite
