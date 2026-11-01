@@ -169,6 +169,19 @@ uvicorn sockboi.main:app --reload
 
 > ใช้ `--reload` เฉพาะเครื่องพัฒนาเท่านั้น อย่าเปิด Development Server ออกอินเทอร์เน็ต
 
+### เริ่มด้วย Docker Compose
+
+สำหรับ PostgreSQL deployment แบบทดลอง:
+
+```bash
+cp .env.example .env
+# แก้ POSTGRES_PASSWORD และ SOCKBOI_API_KEYS ใน .env ก่อน
+docker compose up --build -d
+docker compose logs -f api
+```
+
+Compose จะปฏิเสธการเริ่มฐานข้อมูลหากยังไม่ได้กำหนด `POSTGRES_PASSWORD`; API จะ fail closed จนกว่าจะตั้งค่า API key อย่างน้อยหนึ่งรายการใน `SOCKBOI_API_KEYS`. Redis ไม่ถูกรันโดย default เพราะ API รุ่นนี้ยังไม่ได้ใช้งาน Redis. ZAP อยู่ใน profile `scanner-lab` เท่านั้นและไม่ได้เชื่อมต่อกับ API execution.
+
 ## ตั้งค่า API Authentication
 
 ระบบอ่านตัวแปรแวดล้อม `SOCKBOI_API_KEYS` เป็น JSON Array แต่ละรายการต้องมี:
