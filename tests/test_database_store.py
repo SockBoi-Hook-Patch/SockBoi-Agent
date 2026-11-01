@@ -103,9 +103,9 @@ def test_audit_chain_serializes_concurrent_writers_across_store_instances(tmp_pa
 
 
 def test_audit_checkpoint_is_signed_and_requires_external_secret(tmp_path, monkeypatch):
-    from uuid import uuid4
     import hashlib
     import hmac
+    from uuid import uuid4
 
     database = DatabaseStore("sqlite+pysqlite:///" + str(tmp_path / "checkpoint.db"))
     engagement_id = uuid4()
