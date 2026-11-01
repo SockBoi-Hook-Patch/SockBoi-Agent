@@ -64,7 +64,7 @@ uvicorn sockboi.main:app --reload
 | `POST /knowledge/ingest` | นำเข้า Markdown |
 | `GET /knowledge/search?query=...` | ค้นหาเอกสารความรู้ |
 | `GET /tools` | ดู Typed Tool Registry |
-| `POST /evidence/hash?content=...` | คำนวณ SHA-256 โดยไม่บันทึกเนื้อหา |
+| `POST /evidence/hash` (ส่ง JSON body: `{"content":"..."}`) | คำนวณ SHA-256 โดยไม่บันทึกเนื้อหา |
 
 ### ข้อจำกัดและความปลอดภัย
 - เป็น Developer Preview ยังไม่มีระบบล็อกอินหรือแยกข้อมูลผู้ใช้
