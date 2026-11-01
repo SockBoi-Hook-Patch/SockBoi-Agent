@@ -2,9 +2,9 @@
 
 Skill text is stored as reference material only. This module never executes content.
 """
+import re
 from dataclasses import dataclass
 from hashlib import sha256
-import re
 
 
 MAX_DOCUMENT_BYTES = 256_000
@@ -34,7 +34,7 @@ class SkillLibrary:
             raise ValueError("document exceeds the 256 KB ingestion limit")
         digest = sha256(raw).hexdigest()
         document_id = digest[:16]
-        title_match = re.search(r"(?m)^#\s+(.+)$", content)
+        title_match = re.search(r"(?m)^#\\s+(.+)$", content)
         title = title_match.group(1).strip() if title_match else source.rsplit("/", 1)[-1]
         document = SkillDocument(
             document_id=document_id, source=source, title=title,
@@ -49,7 +49,7 @@ class SkillLibrary:
         terms = set(re.findall(r"[a-zA-Z0-9_ก-๙]+", query.lower()))
         scored: list[tuple[int, SkillDocument]] = []
         for document in self._documents.values():
-            text = f"{document.title}\n{document.content}".lower()
+            text = f"{document.title}\\n{document.content}".lower()
             score = sum(text.count(term) for term in terms)
             if score:
                 scored.append((score, document))
