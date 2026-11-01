@@ -5,7 +5,7 @@ import pytest
 
 from sockboi.approval import ActionEnvelope, ApprovalGrant, validate_approval
 from sockboi.audit import append_event, verify_chain
-from sockboi.security import authenticate_api_key, key_record, load_keyring, require_role, require_tenant
+from sockboi.security import (\n    authenticate_api_key,\n    key_record,\n    load_keyring,\n    require_role,\n    require_tenant,\n)
 
 
 def test_api_key_authentication_and_authorization():
