@@ -23,6 +23,7 @@ from sqlalchemy.pool import StaticPool
 
 from .models import Approval, AuditEvent, Engagement, Finding
 
+
 def _build_engine() -> Engine:
     url = os.getenv("SOCKBOI_DATABASE_URL", "sqlite:///./sockboi.db")
     options = {"pool_pre_ping": True, "future": True}
