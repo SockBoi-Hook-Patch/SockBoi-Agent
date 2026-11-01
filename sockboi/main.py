@@ -19,7 +19,7 @@ from .models import (
     FindingCreate,
 )
 from .policy import PolicyDenied, asset_matches, authorize_action
-from .security import authenticate_api_key, load_keyring
+from .security import authenticate_api_key, load_keyring, require_role, require_tenant
 from .store import store
 from .tool_registry import list_tools
 
@@ -67,14 +67,40 @@ class ApprovalRequest(BaseModel):
     requested_by: str = Field(min_length=3, max_length=254)
 
 
+
+def _principal(request: Request):
+    return request.state.principal
+
+
+def _require_role(request: Request, *roles: str) -> None:
+    try:
+        require_role(_principal(request), *roles)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+
+
+def _get_engagement(engagement_id: UUID, request: Request) -> Engagement:
+    item = store.engagements.get(engagement_id)
+    if item is None:
+        raise HTTPException(404, "engagement not found")
+    try:
+        require_tenant(_principal(request), item.tenant_id)
+    except PermissionError as exc:
+        raise HTTPException(404, "engagement not found") from exc
+    return item
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "sockboi-agent", "version": __version__}
 
 
 @app.post("/engagements", response_model=Engagement, status_code=201)
-def create_engagement(payload: EngagementCreate) -> Engagement:
-    engagement = Engagement(**payload.model_dump())
+def create_engagement(payload: EngagementCreate, request: Request) -> Engagement:
+    _require_role(request, "admin", "operator")
+    data = payload.model_dump()
+    data["owner"] = _principal(request).subject
+    engagement = Engagement(**data, tenant_id=_principal(request).tenant_id)
     store.engagements[engagement.id] = engagement
     store.log(AuditEvent(
         engagement_id=engagement.id, event_type="engagement.created",
@@ -84,23 +110,19 @@ def create_engagement(payload: EngagementCreate) -> Engagement:
 
 
 @app.get("/engagements", response_model=list[Engagement])
-def list_engagements() -> list[Engagement]:
-    return list(store.engagements.values())
+def list_engagements(request: Request) -> list[Engagement]:
+    tenant_id = _principal(request).tenant_id
+    return [item for item in store.engagements.values() if item.tenant_id == tenant_id]
 
 
 @app.get("/engagements/{engagement_id}", response_model=Engagement)
-def get_engagement(engagement_id: UUID) -> Engagement:
-    item = store.engagements.get(engagement_id)
-    if item is None:
-        raise HTTPException(404, "engagement not found")
-    return item
+def get_engagement(engagement_id: UUID, request: Request) -> Engagement:
+    return _get_engagement(engagement_id, request)
 
 
 @app.post("/engagements/{engagement_id}/plan", response_model=AssessmentPlan)
-def create_agent_plan(engagement_id: UUID, target: str) -> AssessmentPlan:
-    engagement = store.engagements.get(engagement_id)
-    if engagement is None:
-        raise HTTPException(404, "engagement not found")
+def create_agent_plan(engagement_id: UUID, target: str, request: Request) -> AssessmentPlan:
+    engagement = _get_engagement(engagement_id, request)
     try:
         plan = build_plan(engagement, target)
     except ValueError as exc:
@@ -118,20 +140,19 @@ def create_agent_plan(engagement_id: UUID, target: str) -> AssessmentPlan:
 
 
 @app.post("/engagements/{engagement_id}/approvals", response_model=Approval, status_code=201)
-def request_approval(engagement_id: UUID, payload: ApprovalRequest) -> Approval:
-    engagement = store.engagements.get(engagement_id)
-    if engagement is None:
-        raise HTTPException(404, "engagement not found")
+def request_approval(engagement_id: UUID, payload: ApprovalRequest, request: Request) -> Approval:
+    _require_role(request, "admin", "operator")
+    engagement = _get_engagement(engagement_id, request)
     if not any(asset_matches(asset, payload.target) for asset in engagement.scope):
         raise HTTPException(403, "approval target must be in engagement scope")
     item = Approval(
         engagement_id=engagement_id, action=payload.action, target=payload.target,
-        technique_id=payload.technique_id, requested_by=payload.requested_by,
+        technique_id=payload.technique_id, requested_by=_principal(request).subject,
     )
     store.approvals[item.id] = item
     store.log(AuditEvent(
         engagement_id=engagement_id, event_type="approval.requested",
-        actor=payload.requested_by,
+        actor=_principal(request).subject,
         detail={"approval_id": str(item.id), "target": payload.target,
                 "technique_id": payload.technique_id},
     ))
@@ -139,10 +160,13 @@ def request_approval(engagement_id: UUID, payload: ApprovalRequest) -> Approval:
 
 
 @app.post("/approvals/{approval_id}/decide", response_model=Approval)
-def decide_approval(approval_id: UUID, approved_by: str, approved: bool) -> Approval:
+def decide_approval(approval_id: UUID, approved: bool, request: Request) -> Approval:
+    _require_role(request, "admin", "reviewer")
     item = store.approvals.get(approval_id)
     if item is None:
         raise HTTPException(404, "approval not found")
+    _get_engagement(item.engagement_id, request)
+    approved_by = _principal(request).subject
     if approved and approved_by == item.requested_by:
         raise HTTPException(403, "requester cannot approve their own request")
     item.approved = approved
@@ -157,11 +181,9 @@ def decide_approval(approval_id: UUID, approved_by: str, approved: bool) -> Appr
 @app.post("/policy/check")
 def policy_check(
     engagement_id: UUID, target: str, risk: ActionRisk,
-    technique_id: str | None = None, approval_id: UUID | None = None,
+    request: Request, technique_id: str | None = None, approval_id: UUID | None = None,
 ) -> dict:
-    engagement = store.engagements.get(engagement_id)
-    if engagement is None:
-        raise HTTPException(404, "engagement not found")
+    engagement = _get_engagement(engagement_id, request)
     approval = store.approvals.get(approval_id) if approval_id else None
     try:
         authorize_action(engagement, target, risk, approval, technique_id)
@@ -179,10 +201,9 @@ def policy_check(
 
 
 @app.post("/findings", response_model=Finding, status_code=201)
-def create_finding(payload: FindingCreate) -> Finding:
-    engagement = store.engagements.get(payload.engagement_id)
-    if engagement is None:
-        raise HTTPException(404, "engagement not found")
+def create_finding(payload: FindingCreate, request: Request) -> Finding:
+    _require_role(request, "admin", "operator")
+    engagement = _get_engagement(payload.engagement_id, request)
     if not any(asset_matches(asset, payload.asset) for asset in engagement.scope):
         raise HTTPException(403, "finding asset must be within an explicitly scoped asset")
     finding = Finding(**payload.model_dump())
@@ -224,7 +245,6 @@ def hash_evidence(payload: EvidenceHashRequest) -> dict:
 
 
 @app.get("/engagements/{engagement_id}/audit", response_model=list[AuditEvent])
-def get_audit(engagement_id: UUID) -> list[AuditEvent]:
-    if engagement_id not in store.engagements:
-        raise HTTPException(404, "engagement not found")
+def get_audit(engagement_id: UUID, request: Request) -> list[AuditEvent]:
+    _get_engagement(engagement_id, request)
     return [event for event in store.audit if event.engagement_id == engagement_id]
