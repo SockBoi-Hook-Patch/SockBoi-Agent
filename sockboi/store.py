@@ -228,10 +228,17 @@ class DatabaseStore:
         metadata.create_all(self.engine)
         try:
             with self.engine.begin() as connection:
+                last_event = connection.execute(
+                    select(self.audit_chain_table.c.sequence, self.audit_chain_table.c.event_hash)
+                    .order_by(self.audit_chain_table.c.sequence.desc()).limit(1)
+                ).first()
                 connection.execute(insert(self.audit_chain_head_table).values(
-                    id=1, sequence=0, head_hash=GENESIS_HASH,
+                    id=1,
+                    sequence=last_event.sequence if last_event else 0,
+                    head_hash=last_event.event_hash if last_event else GENESIS_HASH,
                 ))
         except IntegrityError:
+            # Another application process initialized the singleton head first.
             pass
         self.engagements = DatabaseMapping(self.engine, self.engagement_table, Engagement, self.lock)
         self.approvals = DatabaseMapping(self.engine, self.approval_table, Approval, self.lock)
