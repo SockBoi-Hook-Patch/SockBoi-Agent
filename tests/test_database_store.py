@@ -120,7 +120,7 @@ def test_audit_checkpoint_is_signed_and_requires_external_secret(tmp_path, monke
     checkpoint = database.create_audit_checkpoint(engagement_id)
     assert checkpoint["algorithm"] == "HMAC-SHA256"
     assert checkpoint["engagement_id"] == str(engagement_id)
-    assert len(checkpoint["signature"]) == 64
+    assert len(checkpoint["mac"]) == 64
     message = (
         f'{checkpoint["engagement_id"]}:{checkpoint["event_count"]}:'
         f'{checkpoint["head_hash"]}'
