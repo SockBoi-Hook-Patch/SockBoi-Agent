@@ -1,7 +1,7 @@
 # Architecture / สถาปัตยกรรม
 
 ## Design
-SockBoi AI เป็น Control Plane สำหรับประเมินความปลอดภัยที่ได้รับอนุญาต ไม่ใช่ Unrestricted Exploit Runner
+SockBoi Agent เป็น Control Plane สำหรับประเมินความปลอดภัยที่ได้รับอนุญาต ไม่ใช่ Unrestricted Exploit Runner
 
 ```text
 Dashboard / API
