@@ -1,6 +1,5 @@
 """Curated technique catalog. Entries describe plans; they do not execute tools."""
 from dataclasses import dataclass
-from . import __name__ as _package_name
 
 
 @dataclass(frozen=True)
@@ -15,42 +14,24 @@ class Technique:
 
 
 TECHNIQUES: tuple[Technique, ...] = (
-    Technique(
-        id="inventory.scope_review", title="Scope and asset inventory review",
-        description="Normalize the supplied asset and identify missing ownership or scope metadata.",
-        asset_kinds=("domain", "url", "ip", "cidr"), risk="passive",
-        approval_required=False, category="governance",
-    ),
-    Technique(
-        id="web.headers_review", title="HTTP security-header review",
-        description="Review supplied HTTP response headers for common defensive configuration gaps.",
-        asset_kinds=("domain", "url"), risk="active",
-        approval_required=True, category="web",
-    ),
-    Technique(
-        id="web.tls_review", title="TLS configuration review",
-        description="Assess TLS protocol and certificate configuration for the explicitly scoped endpoint.",
-        asset_kinds=("domain", "url"), risk="active",
-        approval_required=True, category="web",
-    ),
-    Technique(
-        id="api.schema_review", title="API schema review",
-        description="Review a user-provided OpenAPI or GraphQL schema for design and authorization risks.",
-        asset_kinds=("url", "domain"), risk="passive",
-        approval_required=False, category="api",
-    ),
-    Technique(
-        id="network.exposure_review", title="Network exposure review",
-        description="Review a supplied port/service inventory; this plan does not initiate port scans.",
-        asset_kinds=("ip", "cidr"), risk="passive",
-        approval_required=False, category="network",
-    ),
-    Technique(
-        id="evidence.integrity_check", title="Evidence integrity verification",
-        description="Verify hashes and provenance metadata for evidence already collected by the operator.",
-        asset_kinds=("domain", "url", "ip", "cidr"), risk="passive",
-        approval_required=False, category="evidence",
-    ),
+    Technique("inventory.scope_review", "Scope and asset inventory review",
+              "Normalize supplied assets and identify missing ownership or scope metadata.",
+              ("domain", "url", "ip", "cidr"), "passive", False, "governance"),
+    Technique("web.headers_review", "HTTP security-header review",
+              "Review supplied HTTP response headers for common defensive configuration gaps.",
+              ("domain", "url"), "active", True, "web"),
+    Technique("web.tls_review", "TLS configuration review",
+              "Assess TLS protocol and certificate configuration for the scoped endpoint.",
+              ("domain", "url"), "active", True, "web"),
+    Technique("api.schema_review", "API schema review",
+              "Review a user-provided OpenAPI or GraphQL schema for design and authorization risks.",
+              ("url", "domain"), "passive", False, "api"),
+    Technique("network.exposure_review", "Network exposure review",
+              "Review a supplied port/service inventory; this plan does not initiate port scans.",
+              ("ip", "cidr"), "passive", False, "network"),
+    Technique("evidence.integrity_check", "Evidence integrity verification",
+              "Verify hashes and provenance metadata for evidence already collected by the operator.",
+              ("domain", "url", "ip", "cidr"), "passive", False, "evidence"),
 )
 
 
