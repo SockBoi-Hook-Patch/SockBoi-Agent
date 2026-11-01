@@ -30,6 +30,8 @@ class ApkInspectionError(ValueError):
 def _safe_member_name(name: str) -> str:
     if not name or "\\" in name or name.startswith("/"):
         raise ApkInspectionError("unsafe archive member path")
+    if any(part in ("", ".", "..") for part in name.split("/")):
+        raise ApkInspectionError("unsafe archive member path")
     path = PurePosixPath(name)
     if any(part in ("", ".", "..") for part in path.parts):
         raise ApkInspectionError("unsafe archive member path")
@@ -60,7 +62,10 @@ def _manifest_summary(archive: zipfile.ZipFile, names: set[str]) -> dict:
     info = archive.getinfo("AndroidManifest.xml")
     if info.file_size > MAX_MANIFEST_BYTES:
         return {"status": "too_large", "size": info.file_size}
-    raw = archive.read("AndroidManifest.xml")
+    try:
+        raw = archive.read("AndroidManifest.xml")
+    except (zipfile.BadZipFile, RuntimeError, OSError) as exc:
+        raise ApkInspectionError("manifest archive member failed integrity check") from exc
     if raw.lstrip().startswith(b"<"):
         try:
             root = ElementTree.fromstring(raw)
@@ -140,6 +145,8 @@ def inspect_apk_bytes(data: bytes, *, max_bytes: int = MAX_APK_BYTES) -> dict:
             names.add(name)
             if info.flag_bits & 0x1:
                 raise ApkInspectionError("encrypted archive members are not supported")
+            if info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                raise ApkInspectionError("unsupported archive compression method")
             if info.file_size > MAX_ENTRY_BYTES:
                 raise ApkInspectionError("archive member exceeds size limit")
             total_uncompressed += info.file_size
