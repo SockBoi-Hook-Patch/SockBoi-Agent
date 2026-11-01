@@ -1,4 +1,5 @@
 """SockBoi Agent HTTP API."""
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
@@ -7,27 +8,20 @@ from pydantic import BaseModel, Field
 
 from . import __version__
 from .agents.planner import AssessmentPlan, build_plan
+from .approval import ActionEnvelope
 from .evidence import sha256_hex
 from .knowledge import skill_library
-from .models import (
-    ActionRisk,
-    Approval,
-    AuditEvent,
-    Engagement,
-    EngagementCreate,
-    Finding,
-    FindingCreate,
-)
+from .models import ActionRisk, Approval, AuditEvent, Engagement, EngagementCreate, Finding, FindingCreate
 from .policy import PolicyDenied, asset_matches, authorize_action
 from .security import authenticate_api_key, load_keyring, require_role, require_tenant
 from .store import store
 from .tool_registry import list_tools
 
 app = FastAPI(
-    title="SockBoi Agent",
-    version=__version__,
+    title="SockBoi Agent", version=__version__,
     description="Modular Agent + Skills + MCP platform for authorized security assessments.",
 )
+
 
 @app.middleware("http")
 async def require_api_identity(request: Request, call_next):
@@ -64,8 +58,17 @@ class ApprovalRequest(BaseModel):
     action: str = Field(min_length=3, max_length=120)
     target: str = Field(min_length=1, max_length=253)
     technique_id: str = Field(min_length=3, max_length=120)
-    requested_by: str = Field(min_length=3, max_length=254)
+    adapter_id: str = Field(default="http.inspect", min_length=3, max_length=120)
+    parameters: dict = Field(default_factory=dict)
+    risk: ActionRisk = ActionRisk.ACTIVE
 
+
+class ActionEnvelopeRequest(BaseModel):
+    target: str = Field(min_length=1, max_length=253)
+    technique_id: str = Field(min_length=3, max_length=120)
+    adapter_id: str = Field(default="http.inspect", min_length=3, max_length=120)
+    parameters: dict = Field(default_factory=dict)
+    risk: ActionRisk = ActionRisk.ACTIVE
 
 
 def _principal(request: Request):
@@ -90,6 +93,14 @@ def _get_engagement(engagement_id: UUID, request: Request) -> Engagement:
     return item
 
 
+def _action_envelope(engagement: Engagement, target: str, adapter_id: str,
+                     technique_id: str, parameters: dict, risk: ActionRisk) -> ActionEnvelope:
+    return ActionEnvelope(
+        engagement_id=str(engagement.id), tenant_id=engagement.tenant_id, target=target,
+        adapter_id=adapter_id, technique_id=technique_id, parameters=parameters, risk=risk.value,
+    )
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "service": "sockboi-agent", "version": __version__}
@@ -103,8 +114,8 @@ def create_engagement(payload: EngagementCreate, request: Request) -> Engagement
     engagement = Engagement(**data, tenant_id=_principal(request).tenant_id)
     store.engagements[engagement.id] = engagement
     store.log(AuditEvent(
-        engagement_id=engagement.id, event_type="engagement.created",
-        actor=engagement.owner, detail={"authorization_ref": engagement.authorization_ref},
+        engagement_id=engagement.id, event_type="engagement.created", actor=engagement.owner,
+        detail={"authorization_ref": engagement.authorization_ref},
     ))
     return engagement
 
@@ -128,13 +139,13 @@ def create_agent_plan(engagement_id: UUID, target: str, request: Request) -> Ass
     except ValueError as exc:
         store.log(AuditEvent(
             engagement_id=engagement_id, event_type="agent.plan.denied",
-            actor="api", detail={"target": target, "reason": str(exc)},
+            actor=_principal(request).subject, detail={"target": target, "reason": str(exc)},
         ))
         raise HTTPException(403, str(exc)) from exc
     store.log(AuditEvent(
         engagement_id=engagement_id, event_type="agent.plan.created",
-        actor="api", detail={"plan_id": str(plan.plan_id), "target": target,
-                             "steps": len(plan.steps)},
+        actor=_principal(request).subject,
+        detail={"plan_id": str(plan.plan_id), "target": target, "steps": len(plan.steps)},
     ))
     return plan
 
@@ -145,16 +156,22 @@ def request_approval(engagement_id: UUID, payload: ApprovalRequest, request: Req
     engagement = _get_engagement(engagement_id, request)
     if not any(asset_matches(asset, payload.target) for asset in engagement.scope):
         raise HTTPException(403, "approval target must be in engagement scope")
+    envelope = _action_envelope(
+        engagement, payload.target, payload.adapter_id, payload.technique_id,
+        payload.parameters, payload.risk,
+    )
     item = Approval(
         engagement_id=engagement_id, action=payload.action, target=payload.target,
-        technique_id=payload.technique_id, requested_by=_principal(request).subject,
+        technique_id=payload.technique_id, adapter_id=payload.adapter_id,
+        parameters=payload.parameters, risk=payload.risk, envelope_sha256=envelope.digest(),
+        requested_by=_principal(request).subject,
     )
     store.approvals[item.id] = item
     store.log(AuditEvent(
         engagement_id=engagement_id, event_type="approval.requested",
         actor=_principal(request).subject,
-        detail={"approval_id": str(item.id), "target": payload.target,
-                "technique_id": payload.technique_id},
+        detail={"approval_id": str(item.id), "envelope_sha256": item.envelope_sha256,
+                "target": payload.target, "technique_id": payload.technique_id},
     ))
     return item
 
@@ -171,11 +188,44 @@ def decide_approval(approval_id: UUID, approved: bool, request: Request) -> Appr
         raise HTTPException(403, "requester cannot approve their own request")
     item.approved = approved
     item.approved_by = approved_by
+    item.expires_at = datetime.now(UTC) + timedelta(minutes=15) if approved else None
+    store.approvals[item.id] = item
     store.log(AuditEvent(
-        engagement_id=item.engagement_id, event_type="approval.decided",
-        actor=approved_by, detail={"approval_id": str(item.id), "approved": approved},
+        engagement_id=item.engagement_id, event_type="approval.decided", actor=approved_by,
+        detail={"approval_id": str(item.id), "approved": approved,
+                "expires_at": item.expires_at.isoformat() if item.expires_at else None},
     ))
     return item
+
+
+@app.post("/approvals/{approval_id}/consume", response_model=Approval)
+def consume_approval(approval_id: UUID, payload: ActionEnvelopeRequest,
+                     engagement_id: UUID, request: Request) -> Approval:
+    """Consume a one-time grant for an exact action; this endpoint does not execute network traffic."""
+    _require_role(request, "admin", "operator")
+    engagement = _get_engagement(engagement_id, request)
+    item = store.approvals.get(approval_id)
+    if item is None or item.engagement_id != engagement.id:
+        raise HTTPException(404, "approval not found")
+    envelope = _action_envelope(
+        engagement, payload.target, payload.adapter_id, payload.technique_id,
+        payload.parameters, payload.risk,
+    )
+    try:
+        consumed = store.consume_approval(approval_id, envelope.digest())
+    except PermissionError as exc:
+        store.log(AuditEvent(
+            engagement_id=engagement.id, event_type="approval.consume.denied",
+            actor=_principal(request).subject,
+            detail={"approval_id": str(approval_id), "reason": str(exc)},
+        ))
+        raise HTTPException(403, str(exc)) from exc
+    store.log(AuditEvent(
+        engagement_id=engagement.id, event_type="approval.consumed",
+        actor=_principal(request).subject,
+        detail={"approval_id": str(approval_id), "envelope_sha256": envelope.digest()},
+    ))
+    return consumed
 
 
 @app.post("/policy/check")
@@ -190,12 +240,13 @@ def policy_check(
     except PolicyDenied as exc:
         store.log(AuditEvent(
             engagement_id=engagement_id, event_type="policy.denied",
-            actor="api", detail={"target": target, "risk": risk.value, "reason": str(exc)},
+            actor=_principal(request).subject,
+            detail={"target": target, "risk": risk.value, "reason": str(exc)},
         ))
         raise HTTPException(403, str(exc)) from exc
     store.log(AuditEvent(
         engagement_id=engagement_id, event_type="policy.allowed",
-        actor="api", detail={"target": target, "risk": risk.value},
+        actor=_principal(request).subject, detail={"target": target, "risk": risk.value},
     ))
     return {"allowed": True, "target": target, "risk": risk.value}
 
@@ -210,7 +261,8 @@ def create_finding(payload: FindingCreate, request: Request) -> Finding:
     store.findings[finding.id] = finding
     store.log(AuditEvent(
         engagement_id=engagement.id, event_type="finding.created",
-        actor="api", detail={"finding_id": str(finding.id), "severity": finding.severity},
+        actor=_principal(request).subject,
+        detail={"finding_id": str(finding.id), "severity": finding.severity},
     ))
     return finding
 
