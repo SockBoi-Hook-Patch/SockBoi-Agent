@@ -65,7 +65,7 @@ class Approval(BaseModel):
     adapter_id: str = Field(default="http.inspect", min_length=3, max_length=120)
     parameters: dict = Field(default_factory=dict)
     risk: ActionRisk = ActionRisk.ACTIVE
-    envelope_sha256: str
+    envelope_sha256: str = ""
     requested_by: str
     approved_by: str | None = None
     approved: bool = False
