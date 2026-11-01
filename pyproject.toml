@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sockboi-ai"
+name = "sockboi-agent"
 version = "0.3.0"
-description = "Policy-first multi-agent planning and knowledge foundation for authorized security assessments"
+description = "Modular AI agent, security skills, and policy-gated MCP foundation for authorized security assessments"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
