@@ -1,5 +1,5 @@
 """Deterministic policy gate. This module never performs network activity."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from ipaddress import ip_address, ip_network
 from urllib.parse import urlparse
 
@@ -61,5 +61,5 @@ def authorize_action(
         raise PolicyDenied("approval is bound to a different technique")
     if approval.requested_by == approval.approved_by:
         raise PolicyDenied("requester cannot approve their own request")
-    if approval.expires_at and approval.expires_at <= datetime.now(timezone.utc):
+    if approval.expires_at and approval.expires_at <= datetime.now(UTC):
         raise PolicyDenied("approval has expired")
