@@ -3,20 +3,13 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator, MutableMapping
+from datetime import UTC, datetime
 from threading import RLock
 from uuid import UUID
 
 from sqlalchemy import (
-    Column,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    Text,
-    create_engine,
-    delete,
-    insert,
-    select,
+    Column, Integer, MetaData, String, Table, Text, create_engine, delete, insert,
+    select, update,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
@@ -36,10 +29,7 @@ def _build_engine() -> Engine:
 
 class DatabaseMapping[ModelT](MutableMapping[UUID, ModelT]):
     def __init__(self, engine: Engine, table: Table, model: type[ModelT], lock: RLock):
-        self.engine = engine
-        self.table = table
-        self.model = model
-        self.lock = lock
+        self.engine, self.table, self.model, self.lock = engine, table, model, lock
 
     def __getitem__(self, key: UUID) -> ModelT:
         with self.engine.connect() as connection:
@@ -83,9 +73,7 @@ class DatabaseMapping[ModelT](MutableMapping[UUID, ModelT]):
 
 class AuditCollection:
     def __init__(self, engine: Engine, table: Table, lock: RLock):
-        self.engine = engine
-        self.table = table
-        self.lock = lock
+        self.engine, self.table, self.lock = engine, table, lock
 
     def append(self, event: AuditEvent) -> None:
         with self.lock, self.engine.begin() as connection:
@@ -132,14 +120,43 @@ class DatabaseStore:
         self.audit_table = Table(
             "audit_events", metadata, Column("sequence", Integer, primary_key=True, autoincrement=True),
             Column("event_id", String(36), unique=True, nullable=False),
-            Column("engagement_id", String(36), nullable=False),
-            Column("payload", Text, nullable=False),
+            Column("engagement_id", String(36), nullable=False), Column("payload", Text, nullable=False),
         )
         metadata.create_all(self.engine)
         self.engagements = DatabaseMapping(self.engine, self.engagement_table, Engagement, self.lock)
         self.approvals = DatabaseMapping(self.engine, self.approval_table, Approval, self.lock)
         self.findings = DatabaseMapping(self.engine, self.finding_table, Finding, self.lock)
         self.audit = AuditCollection(self.engine, self.audit_table, self.lock)
+
+    def consume_approval(self, approval_id: UUID, envelope_sha256: str) -> Approval:
+        """Atomically consume one approved grant using compare-and-swap on its stored payload."""
+        with self.lock, self.engine.begin() as connection:
+            row = connection.execute(
+                select(self.approval_table.c.payload).where(
+                    self.approval_table.c.id == str(approval_id)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                raise KeyError(approval_id)
+            item = Approval.model_validate_json(row)
+            if not item.approved or item.consumed:
+                raise PermissionError("approval is not available for consumption")
+            if item.envelope_sha256 != envelope_sha256:
+                raise PermissionError("approval does not match the requested action envelope")
+            if item.requested_by == item.approved_by:
+                raise PermissionError("requester and reviewer must be different actors")
+            if item.expires_at is None or item.expires_at <= datetime.now(UTC):
+                raise PermissionError("approval has expired or has no expiry")
+            updated = item.model_copy(update={"consumed": True})
+            result = connection.execute(
+                update(self.approval_table)
+                .where(self.approval_table.c.id == str(approval_id))
+                .where(self.approval_table.c.payload == row)
+                .values(payload=updated.model_dump_json())
+            )
+            if result.rowcount != 1:
+                raise PermissionError("approval was concurrently consumed")
+            return updated
 
     def log(self, event: AuditEvent) -> AuditEvent:
         self.audit.append(event)
