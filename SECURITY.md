@@ -1,4 +1,4 @@
-# Security Policy
+# SockBoi Agent Security Policy
 
 ## Supported release
 
