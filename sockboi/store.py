@@ -366,7 +366,7 @@ class DatabaseStore:
             f'{checkpoint["engagement_id"]}:{checkpoint["event_count"]}:'
             f'{checkpoint["head_hash"]}'
         ).encode()
-        checkpoint["signature"] = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+        checkpoint["mac"] = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
         return checkpoint
 
 
