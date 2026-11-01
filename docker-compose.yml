@@ -2,18 +2,20 @@ services:
   api:
     build: .
     env_file: .env
+    environment:
+      SOCKBOI_DATABASE_URL: postgresql+psycopg://sockboi:${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_.env}@db:5432/sockboi
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
     restart: unless-stopped
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: sockboi
       POSTGRES_USER: sockboi
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set_POSTGRES_PASSWORD_in_.env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,11 +23,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redisdata:/data
   # ZAP is intentionally not exposed to the host. The API does not invoke it yet.
   zap:
     image: ghcr.io/zaproxy/zaproxy:stable
@@ -33,4 +30,3 @@ services:
     profiles: ["scanner-lab"]
 volumes:
   pgdata:
-  redisdata:

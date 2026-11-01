@@ -11,7 +11,7 @@ from sockboi.policy import PolicyDenied, authorize_action
 from sockboi.store import store
 from sockboi.tool_registry import list_tools
 
-client = TestClient(app)
+client = TestClient(app, headers={'Authorization': 'Bearer test-key'})
 
 
 def setup_function():
@@ -92,7 +92,7 @@ def test_self_approval_rejected():
 
 
 def test_api_exposes_v03_capabilities():
-    assert client.get("/health").json()["version"] == "0.3.1"
+    assert client.get("/health").json()["version"] == "0.4.0"
     assert client.get("/tools").json()["execution_enabled"] is False
     ingested = client.post("/knowledge/ingest", json={
         "source": "local/hackskill.md", "content": "# Test skill\nHTTP header review"

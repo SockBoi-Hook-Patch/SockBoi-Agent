@@ -53,6 +53,8 @@ def authorize_action(
         return
     if approval is None or not approval.approved:
         raise PolicyDenied("active actions require explicit human approval")
+    if approval.consumed:
+        raise PolicyDenied("approval has already been consumed")
     if approval.engagement_id != engagement.id:
         raise PolicyDenied("approval belongs to a different engagement")
     if approval.target.lower().rstrip("/") != target.lower().rstrip("/"):

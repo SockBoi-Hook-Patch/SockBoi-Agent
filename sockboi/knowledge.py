@@ -16,6 +16,7 @@ class SkillDocument:
     title: str
     content: str
     content_sha256: str
+    tenant_id: str
     trusted_for_execution: bool = False
 
 
@@ -23,7 +24,11 @@ class SkillLibrary:
     def __init__(self) -> None:
         self._documents: dict[str, SkillDocument] = {}
 
-    def ingest_markdown(self, source: str, content: str) -> SkillDocument:
+    def ingest_markdown(
+        self, source: str, content: str, tenant_id: str = "default",
+    ) -> SkillDocument:
+        if not tenant_id.strip() or len(tenant_id) > 200:
+            raise ValueError("tenant_id must be a non-empty identifier up to 200 characters")
         if not source.strip() or len(source) > 500:
             raise ValueError("source must be a non-empty identifier up to 500 characters")
         if not content.strip():
@@ -32,22 +37,26 @@ class SkillLibrary:
         if len(raw) > MAX_DOCUMENT_BYTES:
             raise ValueError("document exceeds the 256 KB ingestion limit")
         digest = sha256(raw).hexdigest()
-        document_id = digest[:16]
+        document_id = sha256(f"{tenant_id}:{digest}".encode()).hexdigest()[:16]
         title_match = re.search(r"(?m)^#\s+(.+)$", content)
         title = title_match.group(1).strip() if title_match else source.rsplit("/", 1)[-1]
         document = SkillDocument(
             document_id=document_id, source=source, title=title,
-            content=content, content_sha256=digest,
+            content=content, content_sha256=digest, tenant_id=tenant_id,
         )
         self._documents[document_id] = document
         return document
 
-    def search(self, query: str, limit: int = 5) -> list[dict[str, str]]:
+    def search(
+        self, query: str, limit: int = 5, tenant_id: str = "default",
+    ) -> list[dict[str, str]]:
         if not query.strip():
             return []
         terms = set(re.findall(r"[a-zA-Z0-9_ก-๙]+", query.lower()))
         scored: list[tuple[int, SkillDocument]] = []
         for document in self._documents.values():
+            if document.tenant_id != tenant_id:
+                continue
             text = f"{document.title}\n{document.content}".lower()
             score = sum(text.count(term) for term in terms)
             if score:

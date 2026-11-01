@@ -50,6 +50,7 @@ class EngagementCreate(BaseModel):
 
 
 class Engagement(EngagementCreate):
+    tenant_id: str = "default"
     id: UUID = Field(default_factory=uuid4)
     status: EngagementStatus = EngagementStatus.ACTIVE
     created_at: datetime = Field(default_factory=utc_now)
@@ -61,9 +62,14 @@ class Approval(BaseModel):
     action: str
     target: str = Field(min_length=1, max_length=253)
     technique_id: str = Field(min_length=3, max_length=120)
+    adapter_id: str = Field(default="http.inspect", min_length=3, max_length=120)
+    parameters: dict = Field(default_factory=dict)
+    risk: ActionRisk = ActionRisk.ACTIVE
+    envelope_sha256: str = ""
     requested_by: str
     approved_by: str | None = None
     approved: bool = False
+    consumed: bool = False
     expires_at: datetime | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
