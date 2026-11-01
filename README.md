@@ -1,9 +1,9 @@
-# SockBoi AI
+# SockBoi Agent
 
 **Policy-first AI security assessment platform / แพลตฟอร์ม AI สำหรับช่วยประเมินความปลอดภัยไซเบอร์โดยยึดนโยบายและขอบเขตที่ได้รับอนุญาตเป็นหลัก**
 
 > **สถานะ: v0.3.0 Developer Preview (รุ่นทดลองสำหรับนักพัฒนา)**  
-> SockBoi AI มีระบบวางแผนงานแบบ Multi-Agent, คลังความรู้ Markdown, รายการเครื่องมือแบบ typed registry, การผูก Approval กับเป้าหมายและเทคนิค และการคำนวณ SHA-256 สำหรับตรวจสอบความถูกต้องของหลักฐาน  
+> SockBoi Agent มีระบบวางแผนงานแบบ Multi-Agent, คลังความรู้ Markdown, รายการเครื่องมือแบบ typed registry, การผูก Approval กับเป้าหมายและเทคนิค และการคำนวณ SHA-256 สำหรับตรวจสอบความถูกต้องของหลักฐาน  
 > **ข้อจำกัด:** ระบบยังไม่เรียกใช้ Scanner, Browser, MCP Server, LLM หรือเครื่องมือโจมตีจริง ข้อมูลยังเก็บในหน่วยความจำ และยังไม่มี Authentication, RBAC, Tenant Isolation หรือ PostgreSQL persistence ห้ามใช้เป็น Production
 
 ## ภาษา / Languages
@@ -13,8 +13,8 @@
 
 ## ภาษาไทย
 
-### SockBoi AI คืออะไร
-SockBoi AI เป็นแพลตฟอร์มต้นแบบสำหรับช่วยวางแผนและจัดการกระบวนการตรวจสอบความปลอดภัยไซเบอร์ โดยใช้ AI Agent หลายบทบาทร่วมกัน มีระบบกำหนดขอบเขต (Scope), ตรวจสอบสิทธิ์ (Authorization), ขออนุมัติก่อนการทดสอบเชิงรุก และบันทึก Audit Log
+### SockBoi Agent คืออะไร
+SockBoi Agent เป็นแพลตฟอร์มต้นแบบสำหรับช่วยวางแผนและจัดการกระบวนการตรวจสอบความปลอดภัยไซเบอร์ โดยใช้ AI Agent หลายบทบาทร่วมกัน มีระบบกำหนดขอบเขต (Scope), ตรวจสอบสิทธิ์ (Authorization), ขออนุมัติก่อนการทดสอบเชิงรุก และบันทึก Audit Log
 
 แนวคิดหลักคือให้ AI ช่วยวิเคราะห์และจัดลำดับงาน แต่การตัดสินใจด้านสิทธิ์และขอบเขตต้องผ่าน Policy Engine ที่ทำงานแบบ deterministic ไม่ให้โมเดลหรือไฟล์ความรู้เปลี่ยนกฎเอง
 
@@ -32,8 +32,8 @@ SockBoi AI เป็นแพลตฟอร์มต้นแบบสำหร
 ต้องใช้ Python 3.12 ขึ้นไป
 
 ```bash
-git clone https://github.com/SockBoi-Hook-Patch/SOCKBOI-Ai.git
-cd SOCKBOI-Ai
+git clone https://github.com/SockBoi-Hook-Patch/SockBoi-Agent.git
+cd SockBoi-Agent
 python -m venv .venv
 # Linux/macOS
 source .venv/bin/activate
@@ -87,10 +87,10 @@ uvicorn sockboi.main:app --reload
 - [ ] LLM Planner Provider และ Evaluation Suite
 - [ ] Evidence Store และ Report Generator
 
-## English
+## Product Architecture\n\nSockBoi Agent is organized into three modular layers: **Agent Core** (orchestration), **Skills** (versioned assessment playbooks), and **MCP** (typed integrations). The deterministic Policy Engine remains the authorization authority. See [Agent](agent/README.md), [Skills](skills/README.md), [MCP](mcp/README.md), and [Roadmap](docs/roadmap.md).\n\n## English
 
 ### Overview
-SockBoi AI is a developer-preview control plane for authorized security assessments. It coordinates specialist-agent planning while keeping scope and approval decisions in a deterministic policy layer.
+SockBoi Agent is a developer-preview control plane for authorized security assessments. It coordinates specialist-agent planning while keeping scope and approval decisions in a deterministic policy layer.
 
 ### v0.3.0
 - Deterministic multi-agent assessment planning.
@@ -104,8 +104,8 @@ SockBoi AI is a developer-preview control plane for authorized security assessme
 Requires Python 3.12+.
 
 ```bash
-git clone https://github.com/SockBoi-Hook-Patch/SOCKBOI-Ai.git
-cd SOCKBOI-Ai
+git clone https://github.com/SockBoi-Hook-Patch/SockBoi-Agent.git
+cd SockBoi-Agent
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
