@@ -89,7 +89,7 @@ def test_self_approval_rejected():
 
 
 def test_api_exposes_v03_capabilities():
-    assert client.get("/health").json()["version"] == "0.3.0"
+    assert client.get("/health").json()["version"] == "0.3.1"
     assert client.get("/tools").json()["execution_enabled"] is False
     ingested = client.post("/knowledge/ingest", json={
         "source": "local/hackskill.md", "content": "# Test skill\nHTTP header review"
