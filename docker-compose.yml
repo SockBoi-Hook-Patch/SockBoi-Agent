@@ -7,8 +7,10 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
   db:
     image: postgres:16-alpine
