@@ -59,6 +59,8 @@ class Approval(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     engagement_id: UUID
     action: str
+    target: str = Field(min_length=1, max_length=253)
+    technique_id: str = Field(min_length=3, max_length=120)
     requested_by: str
     approved_by: str | None = None
     approved: bool = False
