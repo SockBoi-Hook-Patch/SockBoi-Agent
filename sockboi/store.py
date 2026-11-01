@@ -116,15 +116,22 @@ class AuditCollection:
                 .order_by(self.chain_table.c.sequence)
             ).all()
         from .audit import ChainedEvent
-        events = [
-            ChainedEvent(
-                sequence=row.sequence,
-                payload=AuditEvent.model_validate_json(row.payload).model_dump(mode="json"),
-                previous_hash=row.previous_hash,
-                event_hash=row.event_hash,
-            )
-            for row in rows
-        ]
+        from pydantic import ValidationError
+        events = []
+        try:
+            for row in rows:
+                events.append(ChainedEvent(
+                    sequence=row.sequence,
+                    payload=AuditEvent.model_validate_json(row.payload).model_dump(mode="json"),
+                    previous_hash=row.previous_hash,
+                    event_hash=row.event_hash,
+                ))
+        except (ValueError, ValidationError):
+            return {
+                "valid": False,
+                "event_count": len(rows),
+                "head_hash": rows[-1].event_hash if rows else GENESIS_HASH,
+            }
         valid = verify_chain(events)
         return {
             "valid": valid,
