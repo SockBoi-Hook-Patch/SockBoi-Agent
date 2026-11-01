@@ -45,6 +45,7 @@ def authorize_action(
     target: str,
     risk: ActionRisk,
     approval: Approval | None = None,
+    technique_id: str | None = None,
 ) -> None:
     if not is_in_scope(engagement, target):
         raise PolicyDenied("target is not explicitly in engagement scope")
@@ -54,5 +55,11 @@ def authorize_action(
         raise PolicyDenied("active actions require explicit human approval")
     if approval.engagement_id != engagement.id:
         raise PolicyDenied("approval belongs to a different engagement")
+    if approval.target.lower().rstrip("/") != target.lower().rstrip("/"):
+        raise PolicyDenied("approval is bound to a different target")
+    if technique_id is None or approval.technique_id != technique_id:
+        raise PolicyDenied("approval is bound to a different technique")
+    if approval.requested_by == approval.approved_by:
+        raise PolicyDenied("requester cannot approve their own request")
     if approval.expires_at and approval.expires_at <= datetime.now(timezone.utc):
         raise PolicyDenied("approval has expired")
