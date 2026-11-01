@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from threading import RLock
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import (
     Column,
     Integer,
@@ -21,7 +22,6 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
-from pydantic import ValidationError
 from sqlalchemy.pool import StaticPool
 
 from .audit import GENESIS_HASH, ChainedEvent, event_hash, verify_chain
