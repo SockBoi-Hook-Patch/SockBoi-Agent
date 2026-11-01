@@ -39,7 +39,7 @@ def _safe_member_name(name: str) -> str:
 
 
 def _elf_metadata(header: bytes) -> dict | None:
-    if len(header) < 20 or header[:4] != b"\\x7fELF":
+    if len(header) < 20 or header[:4] != b"\x7fELF":
         return None
     elf_class = {1: "ELF32", 2: "ELF64"}.get(header[4], "unknown")
     endian = {1: "<", 2: ">"}.get(header[5])
@@ -154,11 +154,12 @@ def inspect_apk_bytes(data: bytes, *, max_bytes: int = MAX_APK_BYTES) -> dict:
                 raise ApkInspectionError("symbolic links are not allowed in APK archive")
             if info.is_dir():
                 continue
-            if re.fullmatch(r"classes(?:\\d+)?\\.dex", name):
+            if re.fullmatch(r"classes(?:\d+)?\.dex", name):
                 dex_files.append({"path": name, "size": info.file_size})
             if name.startswith("lib/") and name.endswith(".so"):
                 abi = name.split("/", 2)[1] if len(name.split("/")) > 2 else "unknown"
-                header = archive.read(info)[:20]
+                with archive.open(info) as member:
+                    header = member.read(20)
                 native_libraries.append({
                     "path": name, "abi": abi, "size": info.file_size,
                     "elf": _elf_metadata(header),
