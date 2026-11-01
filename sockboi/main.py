@@ -277,9 +277,12 @@ def create_finding(payload: FindingCreate, request: Request) -> Finding:
 
 
 @app.post("/knowledge/ingest")
-def ingest_knowledge(payload: SkillIngestRequest) -> dict:
+def ingest_knowledge(payload: SkillIngestRequest, request: Request) -> dict:
+    _require_role(request, "admin", "operator")
     try:
-        document = skill_library.ingest_markdown(payload.source, payload.content)
+        document = skill_library.ingest_markdown(
+            payload.source, payload.content, tenant_id=_principal(request).tenant_id,
+        )
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return {
@@ -290,8 +293,12 @@ def ingest_knowledge(payload: SkillIngestRequest) -> dict:
 
 
 @app.get("/knowledge/search")
-def search_knowledge(query: str, limit: int = 5) -> dict:
-    return {"results": skill_library.search(query, limit)}
+def search_knowledge(query: str, request: Request, limit: int = 5) -> dict:
+    return {
+        "results": skill_library.search(
+            query, limit, tenant_id=_principal(request).tenant_id,
+        )
+    }
 
 
 @app.get("/tools")
