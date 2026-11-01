@@ -61,7 +61,7 @@ SockBoi Agent คือ **Control Plane สำหรับงาน Security Ass
 | Typed Tool Registry | มี | แสดงรายการเครื่องมือและ schema; ปิดการ execute |
 | Findings | มี | บันทึก Finding ที่ผูกกับ Engagement และตรวจ Scope |
 | Audit Events | มี | บันทึกเหตุการณ์สำคัญของระบบ |
-| Evidence Hash | มี | คำนวณ SHA-256 โดยไม่เก็บเนื้อหาหลักฐาน |
+| Evidence Hash | มี | คำนวณ SHA-256 โดยไม่เก็บเนื้อหาหลักฐาน |\n| APK ZIP Inspection | มี (static triage) | `POST /engagements/{id}/apk/inspect` ตรวจ ZIP, hash, DEX/native inventory และ plain XML manifest; ไม่เก็บ APK หรือ execute code |
 | Hash-chain Audit Integration | มี | บันทึกแบบ Hash Chain, ตรวจสอบได้ และมี Checkpoint แยกตาม Engagement |
 | LLM Runtime | ยังไม่มี | ยังไม่มีการเชื่อม Provider เพื่อให้ LLM ทำงานใน API flow |
 | MCP Runtime / Scanner Execution | ยังไม่มี | ยังไม่มีการเรียก MCP Server, Nmap, ZAP หรือ Scanner จริง |
@@ -401,7 +401,7 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 | POST | `/knowledge/ingest` | นำเข้า Markdown แบบ Tenant-scoped (admin/operator) |
 | GET | `/knowledge/search?query=...` | ค้นหา Knowledge ภายใน Tenant ของผู้เรียก |
 | GET | `/tools` | ดู Typed Tool Catalog (execution disabled) |
-| POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |
+| POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |\n| POST | `/engagements/{id}/apk/inspect` | Upload APK แบบ tenant-scoped เพื่อ static ZIP inventory และ manifest XML แบบ text; ไม่เก็บไฟล์ต้นฉบับ |
 
 ดู Request/Response Schema แบบเต็มและทดลองเรียกได้ที่ Swagger UI: `/docs`
 
@@ -411,7 +411,7 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 
 - ไม่มี LLM Provider หรือ Prompt-to-Action Runtime ที่เชื่อมใน API
 - ไม่มีการ execute Nmap, Nuclei, ZAP, Browser หรือ MCP tools
-- ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง
+- ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง\n- APK inspection ยังเป็น static ZIP inventory เท่านั้น; ยังไม่มี JADX/Apktool execution, binary manifest decoder, DEX decompilation, signature verification, ADB/Frida runtime adapters
 - Approval Consume เป็นการใช้สิทธิ์ ไม่ใช่การรัน Network Action
 - Database schema ใช้ SQLAlchemy `create_all`; ยังไม่มี Alembic migration workflow
 - ยังไม่มี Alembic migrations, automatic external checkpoint export, approval revocation endpoint หรือ PostgreSQL multi-process integration tests
