@@ -525,3 +525,6 @@ Audit appends serialize through a singleton database head row. PostgreSQL uses r
 Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at least 32 characters. The reviewer/admin-only endpoint `GET /engagements/{engagement_id}/audit/checkpoint` returns an HMAC-SHA256 signature over the event count and head hash. Export the checkpoint (event count, head hash, algorithm, signature) to independently controlled immutable storage or a separate signing service. Keep the secret outside the application database and restrict access to it. A checkpoint is useful only if retained independently; a database administrator who can replace both the chain and its in-database head must not also control the external checkpoint and signing key.
 
 The checkpoint endpoint signs the current verified head; it does not automatically transmit or retain checkpoints externally. Operators must export and preserve the returned record. Production PostgreSQL concurrency behavior and checkpoint retention/rotation still require deployment-specific integration tests and operational procedures.
+
+
+Audit verification reads the chain and its singleton head from one consistent database snapshot (PostgreSQL repeatable-read isolation; SQLite read transaction), avoiding false integrity failures caused solely by an append racing with verification.
