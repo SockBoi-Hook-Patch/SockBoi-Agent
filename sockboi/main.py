@@ -309,3 +309,11 @@ def hash_evidence(payload: EvidenceHashRequest) -> dict:
 def get_audit(engagement_id: UUID, request: Request) -> list[AuditEvent]:
     _get_engagement(engagement_id, request)
     return [event for event in store.audit if event.engagement_id == engagement_id]
+
+
+@app.get("/engagements/{engagement_id}/audit/verify")
+def verify_audit_chain(engagement_id: UUID, request: Request) -> dict:
+    """Verify the global append-only audit chain; reviewer/admin access only."""
+    _require_role(request, "admin", "reviewer")
+    _get_engagement(engagement_id, request)
+    return store.verify_audit_chain()
