@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from ..models import Engagement
-from ..policy import is_in_scope
+from ..policy import asset_matches, is_in_scope
 from .techniques import techniques_for
 
 
@@ -41,10 +41,12 @@ def build_plan(engagement: Engagement, target: str) -> AssessmentPlan:
     if not is_in_scope(engagement, target):
         raise ValueError("target is not explicitly in engagement scope")
 
-    matching_asset = next(
-        asset for asset in engagement.scope
-        if asset.value.lower().rstrip(".") == target.lower().rstrip(".")
-    )
+    matching_assets = [asset for asset in engagement.scope if asset_matches(asset, target)]
+    techniques = {
+        technique.id: technique
+        for asset in matching_assets
+        for technique in techniques_for(asset.kind.value)
+    }
     steps = [
         PlannedStep(
             technique_id=tech.id,
@@ -55,7 +57,7 @@ def build_plan(engagement: Engagement, target: str) -> AssessmentPlan:
             risk=tech.risk,
             approval_required=tech.approval_required,
         )
-        for tech in techniques_for(matching_asset.kind.value)
+        for tech in techniques.values()
     ]
     return AssessmentPlan(
         engagement_id=engagement.id,
