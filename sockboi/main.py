@@ -38,7 +38,7 @@ async def require_api_identity(request: Request, call_next):
         return await call_next(request)
     try:
         keyring = load_keyring()
-    except ValueError:
+    except (TypeError, ValueError):
         return JSONResponse(status_code=503, content={"detail": "API key configuration is invalid"})
     if not keyring:
         return JSONResponse(status_code=503, content={"detail": "API authentication is not configured"})
@@ -313,10 +313,10 @@ def get_audit(engagement_id: UUID, request: Request) -> list[AuditEvent]:
 
 @app.get("/engagements/{engagement_id}/audit/verify")
 def verify_audit_chain(engagement_id: UUID, request: Request) -> dict:
-    """Verify the global append-only audit chain; reviewer/admin access only."""
+    """Verify this engagement's audit view without disclosing other engagements' metadata."""
     _require_role(request, "admin", "reviewer")
     _get_engagement(engagement_id, request)
-    return store.verify_audit_chain()
+    return store.verify_audit_chain(engagement_id)
 
 
 @app.get("/engagements/{engagement_id}/audit/checkpoint")
@@ -325,6 +325,6 @@ def create_audit_checkpoint(engagement_id: UUID, request: Request) -> dict:
     _require_role(request, "admin", "reviewer")
     _get_engagement(engagement_id, request)
     try:
-        return store.create_audit_checkpoint()
+        return store.create_audit_checkpoint(engagement_id)
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
