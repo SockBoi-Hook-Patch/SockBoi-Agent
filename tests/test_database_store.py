@@ -103,18 +103,32 @@ def test_audit_chain_serializes_concurrent_writers_across_store_instances(tmp_pa
 
 
 def test_audit_checkpoint_is_signed_and_requires_external_secret(tmp_path, monkeypatch):
+    from uuid import uuid4
+    import hashlib
+    import hmac
+
     database = DatabaseStore("sqlite+pysqlite:///" + str(tmp_path / "checkpoint.db"))
+    engagement_id = uuid4()
     monkeypatch.delenv("SOCKBOI_AUDIT_CHECKPOINT_KEY", raising=False)
     try:
-        database.create_audit_checkpoint()
+        database.create_audit_checkpoint(engagement_id)
     except RuntimeError as exc:
         assert "at least 32 characters" in str(exc)
     else:
         raise AssertionError("checkpoint must fail closed without a strong secret")
     monkeypatch.setenv("SOCKBOI_AUDIT_CHECKPOINT_KEY", "test-checkpoint-secret-" + "x" * 32)
-    checkpoint = database.create_audit_checkpoint()
+    checkpoint = database.create_audit_checkpoint(engagement_id)
     assert checkpoint["algorithm"] == "HMAC-SHA256"
+    assert checkpoint["engagement_id"] == str(engagement_id)
     assert len(checkpoint["signature"]) == 64
+    message = (
+        f'{checkpoint["engagement_id"]}:{checkpoint["event_count"]}:'
+        f'{checkpoint["head_hash"]}'
+    ).encode()
+    expected = hmac.new(
+        ("test-checkpoint-secret-" + "x" * 32).encode(), message, hashlib.sha256,
+    ).hexdigest()
+    assert hmac.compare_digest(checkpoint["signature"], expected)
 
 
 def test_audit_head_initializes_from_existing_chain_on_upgrade(tmp_path):
