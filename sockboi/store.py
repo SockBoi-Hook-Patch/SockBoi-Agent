@@ -243,7 +243,10 @@ class DatabaseStore:
         self.engagements = DatabaseMapping(self.engine, self.engagement_table, Engagement, self.lock)
         self.approvals = DatabaseMapping(self.engine, self.approval_table, Approval, self.lock)
         self.findings = DatabaseMapping(self.engine, self.finding_table, Finding, self.lock)
-        self.audit = AuditCollection(self.engine, self.audit_table, self.audit_chain_table,\n                                     self.audit_chain_head_table, self.lock)
+        self.audit = AuditCollection(
+            self.engine, self.audit_table, self.audit_chain_table,
+            self.audit_chain_head_table, self.lock,
+        )
 
     def decide_approval(
         self, approval_id: UUID, approved: bool, reviewer: str,
