@@ -94,6 +94,13 @@ def test_approval_is_bound_to_exact_action_and_consumed_once():
     assert decision.status_code == 200
     assert decision.json()["expires_at"] is not None
 
+    # A reviewer cannot rewrite a completed decision, even before consumption.
+    second_decision = reviewer.post(
+        f"/approvals/{approval_id}/decide", params={"approved": "false"}
+    )
+    assert second_decision.status_code == 409
+    assert second_decision.json()["detail"] == "approval decision is immutable"
+
     changed_action = client.post(
         f"/approvals/{approval_id}/consume",
         params={"engagement_id": engagement_id},
@@ -106,6 +113,24 @@ def test_approval_is_bound_to_exact_action_and_consumed_once():
         },
     )
     assert changed_action.status_code == 403
+
+    # Another operator in the same tenant cannot consume this requester's grant.
+    peer_operator = TestClient(app, headers={"Authorization": "Bearer peer-operator-key"})
+    delegated_consume = peer_operator.post(
+        f"/approvals/{approval_id}/consume",
+        params={"engagement_id": engagement_id},
+        json={
+            "target": "approval.example.test",
+            "technique_id": "headers.get",
+            "adapter_id": "http.inspect",
+            "parameters": {"timeout": 3, "max_bytes": 4096},
+            "risk": "active",
+        },
+    )
+    assert delegated_consume.status_code == 403
+    assert delegated_consume.json()["detail"] == (
+        "only the original requester may consume this approval"
+    )
 
     consumed = client.post(
         f"/approvals/{approval_id}/consume",
