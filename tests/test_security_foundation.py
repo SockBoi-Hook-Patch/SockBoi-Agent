@@ -11,7 +11,7 @@ from sockboi.security import (
     load_keyring,
     require_role,
     require_tenant,
-    authenticate_api_key,\n    key_record,\n    load_keyring,\n    require_role,\n    require_tenant,\n)
+
 
 
 def test_api_key_authentication_and_authorization():
