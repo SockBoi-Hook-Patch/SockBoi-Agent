@@ -4,10 +4,10 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator, MutableMapping
 from threading import RLock
-from typing import Generic, TypeVar
+from typing import TypeVar
 from uuid import UUID
 
-from sqlalchemy import Column, Integer, MetaData, String, Table, Text, create_engine, delete, insert, select
+from sqlalchemy import (\n    Column,\n    Integer,\n    MetaData,\n    String,\n    Table,\n    Text,\n    create_engine,\n    delete,\n    insert,\n    select,\n)
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 
@@ -26,7 +26,7 @@ def _build_engine() -> Engine:
     return create_engine(url, **options)
 
 
-class DatabaseMapping(MutableMapping[UUID, ModelT], Generic[ModelT]):
+class DatabaseMapping[ModelT](MutableMapping[UUID, ModelT]):
     def __init__(self, engine: Engine, table: Table, model: type[ModelT], lock: RLock):
         self.engine = engine
         self.table = table
