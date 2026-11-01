@@ -8,8 +8,17 @@ from threading import RLock
 from uuid import UUID
 
 from sqlalchemy import (
-    Column, Integer, MetaData, String, Table, Text, create_engine, delete, insert,
-    select, update,
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    delete,
+    insert,
+    select,
+    update,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
