@@ -225,3 +225,30 @@ def test_audit_verification_and_checkpoint_are_engagement_scoped():
     scoped_verify = reviewer.get(f"/engagements/{first_id}/audit/verify").json()
     assert scoped_verify["event_count"] == 1
     assert "head_matches" not in scoped_verify
+
+
+def test_knowledge_ingestion_and_search_are_tenant_scoped():
+    ingested = client.post("/knowledge/ingest", json={
+        "source": "tenant-a/private-playbook.md",
+        "content": "# Secret Tenant Playbook\ninternal-only-marker-7f3a",
+    })
+    assert ingested.status_code == 200
+    assert ingested.json()["trust"] == "untrusted_reference"
+
+    tenant_b = TestClient(app, headers={"Authorization": "Bearer tenant-b-key"})
+    leaked = tenant_b.get(
+        "/knowledge/search", params={"query": "internal-only-marker-7f3a"},
+    )
+    assert leaked.status_code == 200
+    assert leaked.json()["results"] == []
+
+    visible = client.get(
+        "/knowledge/search", params={"query": "internal-only-marker-7f3a"},
+    )
+    assert visible.status_code == 200
+    assert len(visible.json()["results"]) == 1
+
+    reader_cannot_ingest = tenant_b.post("/knowledge/ingest", json={
+        "source": "reader.md", "content": "# Reader cannot ingest",
+    })
+    assert reader_cannot_ingest.status_code == 403
