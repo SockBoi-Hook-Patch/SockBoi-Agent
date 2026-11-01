@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from sockboi.main import app
 from sockboi.store import store
 
-
 client = TestClient(app, headers={"Authorization": "Bearer test-key"})
 
 
