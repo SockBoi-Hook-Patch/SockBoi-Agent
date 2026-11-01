@@ -62,7 +62,7 @@ SockBoi Agent คือ **Control Plane สำหรับงาน Security Ass
 | Findings | มี | บันทึก Finding ที่ผูกกับ Engagement และตรวจ Scope |
 | Audit Events | มี | บันทึกเหตุการณ์สำคัญของระบบ |
 | Evidence Hash | มี | คำนวณ SHA-256 โดยไม่เก็บเนื้อหาหลักฐาน |
-| Hash-chain Audit Integration | ยังไม่มี | มี primitive/helper แต่ยังไม่เชื่อมเข้ากับวงจรจัดเก็บ Audit ของ API |
+| Hash-chain Audit Integration | มี | บันทึกแบบ Hash Chain, ตรวจสอบได้ และมี Checkpoint แยกตาม Engagement |
 | LLM Runtime | ยังไม่มี | ยังไม่มีการเชื่อม Provider เพื่อให้ LLM ทำงานใน API flow |
 | MCP Runtime / Scanner Execution | ยังไม่มี | ยังไม่มีการเรียก MCP Server, Nmap, ZAP หรือ Scanner จริง |
 
@@ -503,7 +503,7 @@ Parts of the documentation and development workflow were prepared with assistanc
 
 ### Audit integrity note
 
-Audit events are now persisted with a SHA-256 hash-chain record and can be checked through the reviewer/admin-only `GET /engagements/{engagement_id}/audit/verify` endpoint. The verification currently checks the complete shared audit stream, including sequence continuity and event payload hashes. A valid chain is tamper-evident, not independently tamper-proof: production deployments should periodically anchor the reported head hash in a separately controlled system (for example, signed external checkpoints or write-once storage). Database-level concurrent writers across multiple application processes and schema migration management remain deployment-hardening work; this foundation does not claim to provide external anchoring or a complete immutable-storage guarantee.
+Audit events are persisted in a SHA-256 hash chain and can be checked through the reviewer/admin-only `GET /engagements/{engagement_id}/audit/verify` endpoint. The API returns an engagement-scoped derived chain view and does not disclose the shared stream's global event count or head hash. A valid chain is tamper-evident, not independently tamper-proof: production deployments should periodically export signed checkpoints to separately controlled storage. Database schema migration management remains outstanding; this foundation does not claim complete immutable-storage guarantees.
 
 
 The audit verification endpoint requires an authenticated principal with the `reviewer` or `admin` role and a tenant-owned engagement identifier.
@@ -520,9 +520,9 @@ Audit verification is an integrity check, not a substitute for protected backups
 
 ### Concurrent audit writers and signed checkpoints
 
-Audit appends serialize through a singleton database head row. PostgreSQL uses row-level locking (`SELECT ... FOR UPDATE`); SQLite obtains a write reservation with `BEGIN IMMEDIATE`. The event, chain link, and updated head are committed in one transaction. Verification also checks that the stored head row matches the recomputed chain.
+Audit appends serialize through a singleton database head row. PostgreSQL uses row-level locking (`SELECT ... FOR UPDATE`); SQLite obtains a write reservation with `BEGIN IMMEDIATE`. The event, chain link, and updated head are committed in one transaction. Verification checks the global integrity internally, then returns only a deterministic engagement-scoped event count and derived head hash to the authorized caller.
 
-Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at least 32 characters. The reviewer/admin-only endpoint `GET /engagements/{engagement_id}/audit/checkpoint` returns an HMAC-SHA256 signature over the event count and head hash. Export the checkpoint (event count, head hash, algorithm, signature) to independently controlled immutable storage or a separate signing service. Keep the secret outside the application database and restrict access to it. A checkpoint is useful only if retained independently; a database administrator who can replace both the chain and its in-database head must not also control the external checkpoint and signing key.
+Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at least 32 characters. The reviewer/admin-only endpoint `GET /engagements/{engagement_id}/audit/checkpoint` returns an HMAC-SHA256 signature bound to the engagement ID, its event count, and its derived head hash. Export the checkpoint (event count, head hash, algorithm, signature) to independently controlled immutable storage or a separate signing service. Keep the secret outside the application database and restrict access to it. A checkpoint is useful only if retained independently; a database administrator who can replace both the chain and its in-database head must not also control the external checkpoint and signing key.
 
 The checkpoint endpoint signs the current verified head; it does not automatically transmit or retain checkpoints externally. Operators must export and preserve the returned record. Production PostgreSQL concurrency behavior and checkpoint retention/rotation still require deployment-specific integration tests and operational procedures.
 
