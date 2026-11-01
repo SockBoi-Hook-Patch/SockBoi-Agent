@@ -44,7 +44,10 @@ def test_approval_is_bound_to_target_and_technique_and_separate_actor():
     engagement = Engagement(
         name="Authorized lab", authorization_ref="ROE-001",
         owner="owner@example.org",
-        scope=[ScopeAsset(kind="domain", value="lab.example.org")],
+        scope=[
+            ScopeAsset(kind="domain", value="lab.example.org"),
+            ScopeAsset(kind="domain", value="other.lab.example.org"),
+        ],
     )
     approval = Approval(
         engagement_id=engagement.id, action="safe_check",
@@ -71,7 +74,10 @@ def test_self_approval_rejected():
     engagement = Engagement(
         name="Authorized lab", authorization_ref="ROE-001",
         owner="owner@example.org",
-        scope=[ScopeAsset(kind="domain", value="lab.example.org")],
+        scope=[
+            ScopeAsset(kind="domain", value="lab.example.org"),
+            ScopeAsset(kind="domain", value="other.lab.example.org"),
+        ],
     )
     approval = Approval(
         engagement_id=engagement.id, action="safe_check",
@@ -86,7 +92,7 @@ def test_self_approval_rejected():
 
 
 def test_api_exposes_v03_capabilities():
-    assert client.get("/health").json()["version"] == "0.3.0"
+    assert client.get("/health").json()["version"] == "0.3.1"
     assert client.get("/tools").json()["execution_enabled"] is False
     ingested = client.post("/knowledge/ingest", json={
         "source": "local/hackskill.md", "content": "# Test skill\nHTTP header review"

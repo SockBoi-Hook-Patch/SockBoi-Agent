@@ -1,4 +1,5 @@
 import pytest
+
 from sockboi.agents.planner import build_plan
 from sockboi.models import Engagement, ScopeAsset
 

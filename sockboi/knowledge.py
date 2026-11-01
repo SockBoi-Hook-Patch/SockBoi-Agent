@@ -2,10 +2,9 @@
 
 Skill text is stored as reference material only. This module never executes content.
 """
+import re
 from dataclasses import dataclass
 from hashlib import sha256
-import re
-
 
 MAX_DOCUMENT_BYTES = 256_000
 
