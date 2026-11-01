@@ -2,21 +2,37 @@
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 from . import __version__
 from .agents.planner import AssessmentPlan, build_plan
+from .evidence import sha256_hex
+from .knowledge import skill_library
 from .models import (
     ActionRisk, Approval, AuditEvent, Engagement, EngagementCreate,
     Finding, FindingCreate,
 )
-from .policy import PolicyDenied, authorize_action
+from .policy import PolicyDenied, asset_matches, authorize_action
 from .store import store
+from .tool_registry import list_tools
 
 app = FastAPI(
     title="SockBoi AI",
     version=__version__,
-    description="Policy-first multi-agent planning foundation for authorized security assessments.",
+    description="Policy-first multi-agent planning and knowledge foundation for authorized security assessments.",
 )
+
+
+class SkillIngestRequest(BaseModel):
+    source: str = Field(min_length=1, max_length=500)
+    content: str = Field(min_length=1)
+
+
+class ApprovalRequest(BaseModel):
+    action: str = Field(min_length=3, max_length=120)
+    target: str = Field(min_length=1, max_length=253)
+    technique_id: str = Field(min_length=3, max_length=120)
+    requested_by: str = Field(min_length=3, max_length=254)
 
 
 @app.get("/health")
@@ -70,14 +86,22 @@ def create_agent_plan(engagement_id: UUID, target: str) -> AssessmentPlan:
 
 
 @app.post("/engagements/{engagement_id}/approvals", response_model=Approval, status_code=201)
-def request_approval(engagement_id: UUID, action: str, requested_by: str) -> Approval:
-    if engagement_id not in store.engagements:
+def request_approval(engagement_id: UUID, payload: ApprovalRequest) -> Approval:
+    engagement = store.engagements.get(engagement_id)
+    if engagement is None:
         raise HTTPException(404, "engagement not found")
-    item = Approval(engagement_id=engagement_id, action=action, requested_by=requested_by)
+    if not any(asset_matches(asset, payload.target) for asset in engagement.scope):
+        raise HTTPException(403, "approval target must be in engagement scope")
+    item = Approval(
+        engagement_id=engagement_id, action=payload.action, target=payload.target,
+        technique_id=payload.technique_id, requested_by=payload.requested_by,
+    )
     store.approvals[item.id] = item
     store.log(AuditEvent(
         engagement_id=engagement_id, event_type="approval.requested",
-        actor=requested_by, detail={"approval_id": str(item.id), "action": action},
+        actor=payload.requested_by,
+        detail={"approval_id": str(item.id), "target": payload.target,
+                "technique_id": payload.technique_id},
     ))
     return item
 
@@ -87,6 +111,8 @@ def decide_approval(approval_id: UUID, approved_by: str, approved: bool) -> Appr
     item = store.approvals.get(approval_id)
     if item is None:
         raise HTTPException(404, "approval not found")
+    if approved and approved_by == item.requested_by:
+        raise HTTPException(403, "requester cannot approve their own request")
     item.approved = approved
     item.approved_by = approved_by
     store.log(AuditEvent(
@@ -98,14 +124,15 @@ def decide_approval(approval_id: UUID, approved_by: str, approved: bool) -> Appr
 
 @app.post("/policy/check")
 def policy_check(
-    engagement_id: UUID, target: str, risk: ActionRisk, approval_id: UUID | None = None
+    engagement_id: UUID, target: str, risk: ActionRisk,
+    technique_id: str | None = None, approval_id: UUID | None = None,
 ) -> dict:
     engagement = store.engagements.get(engagement_id)
     if engagement is None:
         raise HTTPException(404, "engagement not found")
     approval = store.approvals.get(approval_id) if approval_id else None
     try:
-        authorize_action(engagement, target, risk, approval)
+        authorize_action(engagement, target, risk, approval, technique_id)
     except PolicyDenied as exc:
         store.log(AuditEvent(
             engagement_id=engagement_id, event_type="policy.denied",
@@ -124,8 +151,8 @@ def create_finding(payload: FindingCreate) -> Finding:
     engagement = store.engagements.get(payload.engagement_id)
     if engagement is None:
         raise HTTPException(404, "engagement not found")
-    if not any(a.value.lower() == payload.asset.lower() for a in engagement.scope):
-        raise HTTPException(403, "finding asset must match an explicitly scoped asset")
+    if not any(asset_matches(asset, payload.asset) for asset in engagement.scope):
+        raise HTTPException(403, "finding asset must be within an explicitly scoped asset")
     finding = Finding(**payload.model_dump())
     store.findings[finding.id] = finding
     store.log(AuditEvent(
@@ -133,6 +160,35 @@ def create_finding(payload: FindingCreate) -> Finding:
         actor="api", detail={"finding_id": str(finding.id), "severity": finding.severity},
     ))
     return finding
+
+
+@app.post("/knowledge/ingest")
+def ingest_knowledge(payload: SkillIngestRequest) -> dict:
+    try:
+        document = skill_library.ingest_markdown(payload.source, payload.content)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {
+        "document_id": document.document_id, "title": document.title,
+        "source": document.source, "content_sha256": document.content_sha256,
+        "trust": "untrusted_reference", "execution_enabled": False,
+    }
+
+
+@app.get("/knowledge/search")
+def search_knowledge(query: str, limit: int = 5) -> dict:
+    return {"results": skill_library.search(query, limit)}
+
+
+@app.get("/tools")
+def get_tool_catalog() -> dict:
+    return {"tools": list_tools(), "execution_enabled": False}
+
+
+@app.post("/evidence/hash")
+def hash_evidence(content: str) -> dict:
+    return {"algorithm": "SHA-256", "sha256": sha256_hex(content),
+            "stored": False, "note": "Only a digest is returned; evidence content is not persisted."}
 
 
 @app.get("/engagements/{engagement_id}/audit", response_model=list[AuditEvent])
