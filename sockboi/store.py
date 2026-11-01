@@ -127,7 +127,7 @@ class AuditCollection:
                 connection.rollback()
                 raise
 
-    def verify(self) -> dict:
+    def verify(self, engagement_id: UUID | None = None) -> dict:
         """Verify a consistent database snapshot of the chain and its stored head."""
         with self.engine.connect() as connection:
             if self.engine.dialect.name == "postgresql":
@@ -158,13 +158,37 @@ class AuditCollection:
                 "head_hash": rows[-1].event_hash if rows else GENESIS_HASH,
                 "head_matches": False,
             }
-        computed_hash = events[-1].event_hash if events else GENESIS_HASH
-        head_matches = head.sequence == len(events) and head.head_hash == computed_hash
+        global_head = events[-1].event_hash if events else GENESIS_HASH
+        head_matches = head.sequence == len(events) and head.head_hash == global_head
+        global_valid = verify_chain(events) and head_matches
+        if engagement_id is None:
+            return {
+                "valid": global_valid,
+                "event_count": len(events),
+                "head_hash": global_head,
+                "head_matches": head_matches,
+            }
+
+        # Build a deterministic engagement-only chain so the API never returns
+        # global stream counts or hashes to a tenant-scoped caller.
+        scoped_events = []
+        previous_hash = GENESIS_HASH
+        for row in rows:
+            try:
+                payload = AuditEvent.model_validate_json(row.payload).model_dump(mode="json")
+            except (ValueError, ValidationError):
+                continue
+            if payload["engagement_id"] != str(engagement_id):
+                continue
+            sequence = len(scoped_events) + 1
+            digest = event_hash(sequence, payload, previous_hash)
+            scoped_events.append(ChainedEvent(sequence, payload, previous_hash, digest))
+            previous_hash = digest
+        scoped_hash = scoped_events[-1].event_hash if scoped_events else GENESIS_HASH
         return {
-            "valid": verify_chain(events) and head_matches,
-            "event_count": len(events),
-            "head_hash": computed_hash,
-            "head_matches": head_matches,
+            "valid": global_valid and verify_chain(scoped_events),
+            "event_count": len(scoped_events),
+            "head_hash": scoped_hash,
         }
 
     def __iter__(self) -> Iterator[AuditEvent]:
@@ -320,22 +344,26 @@ class DatabaseStore:
         self.audit.append(event)
         return event
 
-    def verify_audit_chain(self) -> dict:
-        return self.audit.verify()
+    def verify_audit_chain(self, engagement_id: UUID | None = None) -> dict:
+        return self.audit.verify(engagement_id)
 
-    def create_audit_checkpoint(self) -> dict:
+    def create_audit_checkpoint(self, engagement_id: UUID) -> dict:
         secret = os.getenv("SOCKBOI_AUDIT_CHECKPOINT_KEY", "")
         if len(secret) < 32:
             raise RuntimeError("SOCKBOI_AUDIT_CHECKPOINT_KEY must contain at least 32 characters")
-        verification = self.audit.verify()
+        verification = self.audit.verify(engagement_id)
         if not verification["valid"]:
             raise RuntimeError("audit chain integrity verification failed")
         checkpoint = {
             "algorithm": "HMAC-SHA256",
+            "engagement_id": str(engagement_id),
             "event_count": verification["event_count"],
             "head_hash": verification["head_hash"],
         }
-        message = f'{checkpoint["event_count"]}:{checkpoint["head_hash"]}'.encode()
+        message = (
+            f'{checkpoint["engagement_id"]}:{checkpoint["event_count"]}:'
+            f'{checkpoint["head_hash"]}'
+        ).encode()
         checkpoint["signature"] = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
         return checkpoint
 
