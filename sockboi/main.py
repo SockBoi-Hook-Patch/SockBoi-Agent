@@ -340,7 +340,9 @@ def create_audit_checkpoint(engagement_id: UUID, request: Request) -> dict:
 
 
 @app.post("/engagements/{engagement_id}/apk/inspect")
-async def inspect_apk(\n    engagement_id: UUID, request: Request, file: Annotated[UploadFile, File()]\n) -> dict:
+async def inspect_apk(
+    engagement_id: UUID, request: Request, file: Annotated[UploadFile, File()]
+) -> dict:
     """Inspect an uploaded APK as an untrusted ZIP; never extracts or executes it."""
     _require_role(request, "admin", "operator")
     engagement = _get_engagement(engagement_id, request)
