@@ -94,7 +94,7 @@ def test_api_exposes_v03_capabilities():
     assert ingested.status_code == 200
     assert ingested.json()["trust"] == "untrusted_reference"
     assert client.get("/knowledge/search", params={"query": "header"}).json()["results"]
-    assert client.post("/evidence/hash", params={"content": "abc"}).json()["sha256"] == sha256(b"abc").hexdigest()
+    assert client.post("/evidence/hash", json={"content": "abc"}).json()["sha256"] == sha256(b"abc").hexdigest()
 
 
 def test_approval_api_rejects_self_approval():
