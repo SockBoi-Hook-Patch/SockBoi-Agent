@@ -513,3 +513,6 @@ Verification reports the chain validity, number of chained audit events, and cur
 
 
 The audit verification operation is read-only and does not change engagement state or consume approvals.
+
+
+Audit verification is an integrity check, not a substitute for protected backups, database access controls, or independently retained checkpoints.
