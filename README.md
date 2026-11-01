@@ -9,7 +9,7 @@
 >
 > โค้ดใน branch `feat/v0.4-active-assessment-foundation` มี Authentication, RBAC, Tenant Isolation, SQLAlchemy persistence และ Action-bound Approval foundation แล้ว แต่ยัง **ไม่ใช่เครื่องมือ Pentest ที่สั่ง Scanner หรือยิงทดสอบเครือข่ายได้จริง** และยังไม่พร้อมใช้ Production
 >
-> หมายเหตุ: package metadata ปัจจุบันยังระบุเวอร์ชัน `0.3.1`; คำว่า v0.4 ใน README นี้หมายถึงชุดงาน foundation บน branch ดังกล่าว ไม่ใช่การประกาศ release/tag ใหม่
+> หมายเหตุ: เวอร์ชันแพ็กเกจใน branch นี้คือ `0.4.0`; การ Merge PR ไม่ได้สร้าง GitHub Release หรือ tag ให้อัตโนมัติ
 
 ---
 
@@ -398,7 +398,6 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 - ไม่มีการ execute Nmap, Nuclei, ZAP, Browser หรือ MCP tools
 - ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง
 - Approval Consume เป็นการใช้สิทธิ์ ไม่ใช่การรัน Network Action
-- Hash-chain Audit helper ยังไม่ถูกเชื่อมเข้ากับ API/Storage Lifecycle; Audit Events ปัจจุบันยังไม่ใช่หลักฐานแบบ tamper-evident
 - Database schema ใช้ SQLAlchemy `create_all`; ยังไม่มี Alembic migration workflow
 - ยังต้องทบทวน hardening เช่น approval decision immutability/revocation, actor binding สำหรับการ consume, parameter schema allowlist และการทดสอบขอบเขตเพิ่มเติม
 - ยังไม่ผ่านการรับรอง Production Security Review
@@ -527,4 +526,4 @@ Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at 
 The checkpoint endpoint signs the current verified head; it does not automatically transmit or retain checkpoints externally. Operators must export and preserve the returned record. Production PostgreSQL concurrency behavior and checkpoint retention/rotation still require deployment-specific integration tests and operational procedures.
 
 
-Audit verification reads the chain and its singleton head from one consistent database snapshot (PostgreSQL repeatable-read isolation; SQLite read transaction), avoiding false integrity failures caused solely by an append racing with verification.
+Audit verification reads the chain and its singleton head from one consistent database snapshot (PostgreSQL repeatable-read isolation; SQLite read transaction), avoiding false integrity failures caused solely by an append racing with verification. The API's derived audit view and signed checkpoint are bound to one engagement and do not disclose global stream counts or hashes.
