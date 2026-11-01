@@ -6,7 +6,7 @@ import hmac
 import json
 import os
 from dataclasses import dataclass
-from typing import Iterable
+from collections.abc import Iterable
 
 
 @dataclass(frozen=True)
@@ -30,11 +30,11 @@ def load_keyring(raw: str | None = None) -> dict[str, Principal]:
     except json.JSONDecodeError as exc:
         raise ValueError("SOCKBOI_API_KEYS must be valid JSON") from exc
     if not isinstance(records, list):
-        raise ValueError("SOCKBOI_API_KEYS must be a JSON array")
+        raise TypeError("SOCKBOI_API_KEYS must be a JSON array")
     keyring: dict[str, Principal] = {}
     for item in records:
         if not isinstance(item, dict):
-            raise ValueError("each API key record must be an object")
+            raise TypeError("each API key record must be an object")
         digest, subject, tenant_id, roles = (
             item.get("key_sha256"), item.get("subject"),
             item.get("tenant_id"), item.get("roles")
