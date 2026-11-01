@@ -37,7 +37,7 @@ class SkillLibrary:
         if len(raw) > MAX_DOCUMENT_BYTES:
             raise ValueError("document exceeds the 256 KB ingestion limit")
         digest = sha256(raw).hexdigest()
-        document_id = sha256(f"{tenant_id}:{digest}".encode("utf-8")).hexdigest()[:16]
+        document_id = sha256(f"{tenant_id}:{digest}".encode()).hexdigest()[:16]
         title_match = re.search(r"(?m)^#\s+(.+)$", content)
         title = title_match.group(1).strip() if title_match else source.rsplit("/", 1)[-1]
         document = SkillDocument(
