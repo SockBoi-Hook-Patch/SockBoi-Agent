@@ -192,12 +192,11 @@ def decide_approval(approval_id: UUID, approved: bool, request: Request) -> Appr
         raise HTTPException(404, "approval not found")
     _get_engagement(item.engagement_id, request)
     approved_by = _principal(request).subject
-    if approved and approved_by == item.requested_by:
-        raise HTTPException(403, "requester cannot approve their own request")
-    item.approved = approved
-    item.approved_by = approved_by
-    item.expires_at = datetime.now(UTC) + timedelta(minutes=15) if approved else None
-    store.approvals[item.id] = item
+    expires_at = datetime.now(UTC) + timedelta(minutes=15) if approved else None
+    try:
+        item = store.decide_approval(approval_id, approved, approved_by, expires_at)
+    except PermissionError as exc:
+        raise HTTPException(409, str(exc)) from exc
     store.log(AuditEvent(
         engagement_id=item.engagement_id, event_type="approval.decided", actor=approved_by,
         detail={"approval_id": str(item.id), "approved": approved,
@@ -220,7 +219,7 @@ def consume_approval(approval_id: UUID, payload: ActionEnvelopeRequest,
         payload.parameters, payload.risk,
     )
     try:
-        consumed = store.consume_approval(approval_id, envelope.digest())
+        consumed = store.consume_approval(approval_id, envelope.digest(), _principal(request).subject)
     except PermissionError as exc:
         store.log(AuditEvent(
             engagement_id=engagement.id, event_type="approval.consume.denied",
