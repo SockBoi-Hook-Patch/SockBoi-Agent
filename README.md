@@ -499,3 +499,8 @@ Contributions should include tests and documentation, preserve explicit scope en
 ## AI-assisted development
 
 Parts of the documentation and development workflow were prepared with assistance from ChatGPT (OpenAI) and OpenAI Codex. These tools are acknowledged as AI assistance, not as repository owners or GitHub contributors.
+
+
+### Audit integrity note
+
+Audit events are now persisted with a SHA-256 hash-chain record and can be checked through the reviewer/admin-only `GET /engagements/{engagement_id}/audit/verify` endpoint. The verification currently checks the complete shared audit stream, including sequence continuity and event payload hashes. A valid chain is tamper-evident, not independently tamper-proof: production deployments should periodically anchor the reported head hash in a separately controlled system (for example, signed external checkpoints or write-once storage). Database-level concurrent writers across multiple application processes and schema migration management remain deployment-hardening work; this foundation does not claim to provide external anchoring or a complete immutable-storage guarantee.
