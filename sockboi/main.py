@@ -2,13 +2,15 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from typing import Annotated
+
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
-from .apk_inspector import ApkInspectionError, MAX_APK_BYTES, inspect_apk_bytes
 from .agents.planner import AssessmentPlan, build_plan
+from .apk_inspector import MAX_APK_BYTES, ApkInspectionError, inspect_apk_bytes
 from .approval import ActionEnvelope
 from .evidence import sha256_hex
 from .knowledge import skill_library
@@ -142,7 +144,7 @@ def get_engagement(engagement_id: UUID, request: Request) -> Engagement:
 
 @app.post("/engagements/{engagement_id}/plan", response_model=AssessmentPlan)
 def create_agent_plan(engagement_id: UUID, target: str, request: Request) -> AssessmentPlan:
-    engagement = _get_engagement(engagement_id, request)
+    _get_engagement(engagement_id, request)
     try:
         plan = build_plan(engagement, target)
     except ValueError as exc:
@@ -339,7 +341,7 @@ def create_audit_checkpoint(engagement_id: UUID, request: Request) -> dict:
 
 
 @app.post("/engagements/{engagement_id}/apk/inspect")
-async def inspect_apk(engagement_id: UUID, request: Request, file: UploadFile = File(...)) -> dict:
+async def inspect_apk(\n    engagement_id: UUID, request: Request, file: Annotated[UploadFile, File()]\n) -> dict:
     """Inspect an uploaded APK as an untrusted ZIP; never extracts or executes it."""
     _require_role(request, "admin", "operator")
     engagement = _get_engagement(engagement_id, request)
