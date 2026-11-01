@@ -128,13 +128,20 @@ class AuditCollection:
                 raise
 
     def verify(self) -> dict:
-        """Verify sequence continuity, previous hashes and event digests."""
+        """Verify a consistent database snapshot of the chain and its stored head."""
         with self.engine.connect() as connection:
-            rows = connection.execute(
-                select(self.chain_table.c.sequence, self.chain_table.c.payload,
-                       self.chain_table.c.previous_hash, self.chain_table.c.event_hash)
-                .order_by(self.chain_table.c.sequence)
-            ).all()
+            if self.engine.dialect.name == "postgresql":
+                connection = connection.execution_options(isolation_level="REPEATABLE READ")
+            with connection.begin():
+                rows = connection.execute(
+                    select(self.chain_table.c.sequence, self.chain_table.c.payload,
+                           self.chain_table.c.previous_hash, self.chain_table.c.event_hash)
+                    .order_by(self.chain_table.c.sequence)
+                ).all()
+                head = connection.execute(
+                    select(self.head_table.c.sequence, self.head_table.c.head_hash)
+                    .where(self.head_table.c.id == 1)
+                ).one()
         events = []
         try:
             for row in rows:
@@ -149,12 +156,8 @@ class AuditCollection:
                 "valid": False,
                 "event_count": len(rows),
                 "head_hash": rows[-1].event_hash if rows else GENESIS_HASH,
+                "head_matches": False,
             }
-        with self.engine.connect() as connection:
-            head = connection.execute(
-                select(self.head_table.c.sequence, self.head_table.c.head_hash)
-                .where(self.head_table.c.id == 1)
-            ).one()
         computed_hash = events[-1].event_hash if events else GENESIS_HASH
         head_matches = head.sequence == len(events) and head.head_hash == computed_hash
         return {
@@ -332,7 +335,7 @@ class DatabaseStore:
             "event_count": verification["event_count"],
             "head_hash": verification["head_hash"],
         }
-        message = f'{checkpoint["event_count"]}:{checkpoint["head_hash"]}'.encode("utf-8")
+        message = f'{checkpoint["event_count"]}:{checkpoint["head_hash"]}'.encode()
         checkpoint["signature"] = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
         return checkpoint
 
