@@ -40,3 +40,30 @@ def test_create_engagement_and_policy_check():
         "risk": "passive",
     })
     assert denied.status_code == 403
+
+
+def test_api_requires_bearer_key_and_isolates_tenants():
+    unauthenticated = TestClient(app)
+    assert unauthenticated.get("/engagements").status_code == 401
+
+    created = client.post("/engagements", json={
+        "name": "Tenant A lab",
+        "authorization_ref": "ROE-TENANT-A",
+        "owner": "spoofed-owner@example.org",
+        "scope": [{"kind": "domain", "value": "tenant-a.example.test"}],
+    })
+    assert created.status_code == 201
+    assert created.json()["owner"] == "test-operator"
+    assert created.json()["tenant_id"] == "test-tenant"
+
+    tenant_b = TestClient(app, headers={"Authorization": "Bearer tenant-b-key"})
+    assert tenant_b.get(f"/engagements/{created.json()['id']}").status_code == 404
+    assert tenant_b.get("/engagements").json() == []
+
+    denied = tenant_b.post("/engagements", json={
+        "name": "Reader cannot create",
+        "authorization_ref": "ROE-READER",
+        "owner": "reader@example.org",
+        "scope": [{"kind": "domain", "value": "reader.example.test"}],
+    })
+    assert denied.status_code == 403
