@@ -23,6 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 
+from .audit import GENESIS_HASH, event_hash, verify_chain
 from .models import Approval, AuditEvent, Engagement, Finding
 
 
@@ -81,15 +82,55 @@ class DatabaseMapping[ModelT](MutableMapping[UUID, ModelT]):
 
 
 class AuditCollection:
-    def __init__(self, engine: Engine, table: Table, lock: RLock):
-        self.engine, self.table, self.lock = engine, table, lock
+    def __init__(self, engine: Engine, table: Table, chain_table: Table, lock: RLock):
+        self.engine, self.table, self.chain_table, self.lock = engine, table, chain_table, lock
 
     def append(self, event: AuditEvent) -> None:
+        """Persist the event and its hash-chain link in one database transaction."""
+        payload = event.model_dump(mode="json")
         with self.lock, self.engine.begin() as connection:
+            previous_row = connection.execute(
+                select(self.chain_table.c.sequence, self.chain_table.c.event_hash)
+                .order_by(self.chain_table.c.sequence.desc()).limit(1)
+            ).first()
+            previous_hash = previous_row.event_hash if previous_row else GENESIS_HASH
+            sequence = (previous_row.sequence + 1) if previous_row else 1
+            digest = event_hash(sequence, payload, previous_hash)
             connection.execute(insert(self.table).values(
                 event_id=str(event.id), engagement_id=str(event.engagement_id),
                 payload=event.model_dump_json(),
             ))
+            connection.execute(insert(self.chain_table).values(
+                sequence=sequence, event_id=str(event.id),
+                engagement_id=str(event.engagement_id),
+                payload=event.model_dump_json(), previous_hash=previous_hash,
+                event_hash=digest,
+            ))
+
+    def verify(self) -> dict:
+        """Verify sequence continuity, previous hashes and event digests."""
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(self.chain_table.c.sequence, self.chain_table.c.payload,
+                       self.chain_table.c.previous_hash, self.chain_table.c.event_hash)
+                .order_by(self.chain_table.c.sequence)
+            ).all()
+        from .audit import ChainedEvent
+        events = [
+            ChainedEvent(
+                sequence=row.sequence,
+                payload=AuditEvent.model_validate_json(row.payload).model_dump(mode="json"),
+                previous_hash=row.previous_hash,
+                event_hash=row.event_hash,
+            )
+            for row in rows
+        ]
+        valid = verify_chain(events)
+        return {
+            "valid": valid,
+            "event_count": len(events),
+            "head_hash": events[-1].event_hash if events else GENESIS_HASH,
+        }
 
     def __iter__(self) -> Iterator[AuditEvent]:
         with self.engine.connect() as connection:
@@ -131,11 +172,20 @@ class DatabaseStore:
             Column("event_id", String(36), unique=True, nullable=False),
             Column("engagement_id", String(36), nullable=False), Column("payload", Text, nullable=False),
         )
+        self.audit_chain_table = Table(
+            "audit_chain_events", metadata,
+            Column("sequence", Integer, primary_key=True, autoincrement=True),
+            Column("event_id", String(36), unique=True, nullable=False),
+            Column("engagement_id", String(36), nullable=False),
+            Column("payload", Text, nullable=False),
+            Column("previous_hash", String(64), nullable=False),
+            Column("event_hash", String(64), nullable=False),
+        )
         metadata.create_all(self.engine)
         self.engagements = DatabaseMapping(self.engine, self.engagement_table, Engagement, self.lock)
         self.approvals = DatabaseMapping(self.engine, self.approval_table, Approval, self.lock)
         self.findings = DatabaseMapping(self.engine, self.finding_table, Finding, self.lock)
-        self.audit = AuditCollection(self.engine, self.audit_table, self.lock)
+        self.audit = AuditCollection(self.engine, self.audit_table, self.audit_chain_table, self.lock)
 
     def decide_approval(
         self, approval_id: UUID, approved: bool, reviewer: str,
@@ -205,6 +255,9 @@ class DatabaseStore:
     def log(self, event: AuditEvent) -> AuditEvent:
         self.audit.append(event)
         return event
+
+    def verify_audit_chain(self) -> dict:
+        return self.audit.verify()
 
 
 store = DatabaseStore()
