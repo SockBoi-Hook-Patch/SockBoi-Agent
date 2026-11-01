@@ -77,3 +77,41 @@ def test_audit_chain_uses_genesis_for_empty_stream(tmp_path):
     assert result["valid"] is True
     assert result["event_count"] == 0
     assert result["head_hash"] == "0" * 64
+
+
+def test_audit_chain_serializes_concurrent_writers_across_store_instances(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from uuid import uuid4
+
+    database_url = "sqlite+pysqlite:///" + str(tmp_path / "concurrent-chain.db")
+    first = DatabaseStore(database_url)
+    second = DatabaseStore(database_url)
+
+    def append(index):
+        target = first if index % 2 else second
+        target.log(AuditEvent(
+            engagement_id=uuid4(), event_type="concurrency.test",
+            actor=f"worker-{index}", detail={"index": index},
+        ))
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(append, range(32)))
+    result = first.verify_audit_chain()
+    assert result["valid"] is True
+    assert result["event_count"] == 32
+    assert result["head_matches"] is True
+
+
+def test_audit_checkpoint_is_signed_and_requires_external_secret(tmp_path, monkeypatch):
+    database = DatabaseStore("sqlite+pysqlite:///" + str(tmp_path / "checkpoint.db"))
+    monkeypatch.delenv("SOCKBOI_AUDIT_CHECKPOINT_KEY", raising=False)
+    try:
+        database.create_audit_checkpoint()
+    except RuntimeError as exc:
+        assert "at least 32 characters" in str(exc)
+    else:
+        raise AssertionError("checkpoint must fail closed without a strong secret")
+    monkeypatch.setenv("SOCKBOI_AUDIT_CHECKPOINT_KEY", "test-checkpoint-secret-" + "x" * 32)
+    checkpoint = database.create_audit_checkpoint()
+    assert checkpoint["algorithm"] == "HMAC-SHA256"
+    assert len(checkpoint["signature"]) == 64
