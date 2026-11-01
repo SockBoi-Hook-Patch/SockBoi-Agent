@@ -1,6 +1,7 @@
+import pytest
+
 from sockboi.models import ActionRisk, Approval, Engagement, ScopeAsset
 from sockboi.policy import PolicyDenied, authorize_action, is_in_scope
-import pytest
 
 
 def engagement():
