@@ -4,17 +4,24 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator, MutableMapping
 from threading import RLock
-from typing import TypeVar
 from uuid import UUID
 
-from sqlalchemy import (\n    Column,\n    Integer,\n    MetaData,\n    String,\n    Table,\n    Text,\n    create_engine,\n    delete,\n    insert,\n    select,\n)
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    delete,
+    insert,
+    select,
+)
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import StaticPool
 
 from .models import Approval, AuditEvent, Engagement, Finding
-
-ModelT = TypeVar("ModelT")
-
 
 def _build_engine() -> Engine:
     url = os.getenv("SOCKBOI_DATABASE_URL", "sqlite:///./sockboi.db")
