@@ -44,7 +44,10 @@ def test_approval_is_bound_to_target_and_technique_and_separate_actor():
     engagement = Engagement(
         name="Authorized lab", authorization_ref="ROE-001",
         owner="owner@example.org",
-        scope=[ScopeAsset(kind="domain", value="lab.example.org")],
+        scope=[
+            ScopeAsset(kind="domain", value="lab.example.org"),
+            ScopeAsset(kind="domain", value="other.lab.example.org"),
+        ],
     )
     approval = Approval(
         engagement_id=engagement.id, action="safe_check",
