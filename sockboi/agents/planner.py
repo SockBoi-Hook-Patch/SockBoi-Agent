@@ -1,5 +1,6 @@
 """Deterministic multi-agent plan builder; no network or tool execution occurs here."""
 from uuid import UUID, uuid4
+
 from pydantic import BaseModel, Field
 
 from ..models import Engagement
