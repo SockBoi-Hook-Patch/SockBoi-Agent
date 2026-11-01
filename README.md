@@ -510,3 +510,6 @@ The audit verification endpoint requires an authenticated principal with the `re
 
 
 Verification reports the chain validity, number of chained audit events, and current head digest; it does not repair or rewrite a damaged chain.
+
+
+The audit verification operation is read-only and does not change engagement state or consume approvals.
