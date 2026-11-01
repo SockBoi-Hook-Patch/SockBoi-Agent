@@ -176,5 +176,6 @@ def test_audit_chain_verification_endpoint_requires_reviewer():
     assert verified.json()["valid"] is True
     assert verified.json()["event_count"] >= 1
 
-    forbidden = client.get(f"/engagements/{engagement_id}/audit/verify")
+    reader = TestClient(app, headers={"Authorization": "Bearer tenant-b-key"})
+    forbidden = reader.get(f"/engagements/{engagement_id}/audit/verify")
     assert forbidden.status_code == 403
