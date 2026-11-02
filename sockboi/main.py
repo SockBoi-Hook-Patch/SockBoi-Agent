@@ -1,13 +1,15 @@
 """SockBoi Agent HTTP API."""
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
 from .agents.planner import AssessmentPlan, build_plan
+from .apk_inspector import MAX_APK_BYTES, ApkInspectionError, inspect_apk_bytes
 from .approval import ActionEnvelope
 from .evidence import sha256_hex
 from .knowledge import skill_library
@@ -335,3 +337,47 @@ def create_audit_checkpoint(engagement_id: UUID, request: Request) -> dict:
         return store.create_audit_checkpoint(engagement_id)
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
+
+
+@app.post("/engagements/{engagement_id}/apk/inspect")
+async def inspect_apk(
+    engagement_id: UUID, request: Request, file: Annotated[UploadFile, File()]
+) -> dict:
+    """Inspect an uploaded APK as an untrusted ZIP; never extracts or executes it."""
+    _require_role(request, "admin", "operator")
+    _get_engagement(engagement_id, request)
+    payload = bytearray()
+    try:
+        while chunk := await file.read(1024 * 1024):
+            if len(payload) + len(chunk) > MAX_APK_BYTES:
+                store.log(AuditEvent(
+                    engagement_id=engagement_id, event_type="apk.inspect.rejected",
+                    actor=_principal(request).subject,
+                    detail={"reason": "size_limit", "limit_bytes": MAX_APK_BYTES},
+                ))
+                raise HTTPException(413, "APK exceeds configured upload size limit")
+            payload.extend(chunk)
+        try:
+            result = inspect_apk_bytes(bytes(payload))
+        except ApkInspectionError as exc:
+            store.log(AuditEvent(
+                engagement_id=engagement_id, event_type="apk.inspect.rejected",
+                actor=_principal(request).subject,
+                detail={"reason": str(exc)[:200]},
+            ))
+            raise HTTPException(400, str(exc)) from exc
+        store.log(AuditEvent(
+            engagement_id=engagement_id, event_type="apk.inspect.completed",
+            actor=_principal(request).subject,
+            detail={
+                "artifact_sha256": result["sha256"],
+                "size_bytes": result["size_bytes"],
+                "entry_count": result["entry_count"],
+                "manifest_status": result["package_manifest"]["status"],
+                "dex_count": len(result["dex_files"]),
+                "native_library_count": len(result["native_libraries"]),
+            },
+        ))
+        return result
+    finally:
+        await file.close()

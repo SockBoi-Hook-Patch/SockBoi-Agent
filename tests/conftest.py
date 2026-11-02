@@ -11,4 +11,5 @@ os.environ["SOCKBOI_API_KEYS"] = json.dumps([
     key_record("tenant-b-key", "tenant-b-reader", "tenant-b", ["reader"]),
     key_record("reviewer-key", "independent-reviewer", "test-tenant", ["reviewer"]),
     key_record("peer-operator-key", "peer-operator", "test-tenant", ["operator"]),
+    key_record("tenant-b-operator-key", "tenant-b-operator", "tenant-b", ["operator"]),
 ])
