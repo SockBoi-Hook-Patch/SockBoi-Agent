@@ -29,13 +29,14 @@
 ### Android / APK assessment — staged capability
 
 - APK triage and specialist Skill taxonomy: added.
-- Safe offline APK ZIP inspection library: added; not yet exposed as an API upload service.
-- ADB and Frida playbooks: added in the dependent Android Skills branch; live adapters remain unimplemented.
-- Static providers (JADX, Apktool/aapt2, native/JNI, APK signer verification): planned.
-- Evidence graph, case router, dynamic emulator worker and Frida instrumentation runtime: planned.
+- Safe offline APK ZIP inspection library and tenant-scoped inspect endpoint: included in the pending Android foundation PR; confirm CI and merge before treating as mainline.
+- ADB and Frida playbooks: added; live adapters remain unimplemented.
+- Hook Audit, Patch Integrity Audit and Protection Resilience Audit playbooks: added in this PR update.
+- Static providers (JADX, Apktool/aapt2, DEX/resource/native diff, cryptographic APK signer verification): planned.
+- Evidence graph, case router, dynamic emulator worker, Frida instrumentation runtime and automated resilience test harness: planned.
 - Flutter, Unity/IL2CPP, React Native and native analysis provider integrations: planned.
 
-See [APK Reverse Engineering Roadmap](apk-reverse-engineering-roadmap.md) and [Android Dynamic Assessment](android-dynamic-assessment.md).
+See [APK Reverse Engineering Roadmap](apk-reverse-engineering-roadmap.md), [Android Dynamic Assessment](android-dynamic-assessment.md), and [Hook, Patch and Protection Audit](android-hook-patch-bypass-audit.md).
 
 ## Release rule
 A feature is implemented only when code, tests, documentation and a verified CI run exist. Playbooks and roadmap entries must not be advertised as executable capabilities.
