@@ -33,7 +33,7 @@ This roadmap distinguishes code merged into `main` from open pull requests, desi
 ## Milestones
 
 ### v0.4 — Security and persistence foundation
-<badge>Implemented in main</badge>
+**Status: Implemented in main**
 
 - Fail-closed API-key authentication.
 - Role checks and tenant isolation for implemented endpoints.
@@ -44,7 +44,7 @@ This roadmap distinguishes code merged into `main` from open pull requests, desi
 - Package version remains 0.4.0; no release tag is implied by merge.
 
 ### v0.5 — APK static analysis and artifact integrity
-<badge color="warning">In progress</badge>
+**Status: In progress**
 
 **Already in main**
 - Safe APK upload and bounded ZIP inspection.
@@ -70,7 +70,7 @@ Open work at the snapshot:
 - Add test coverage for malformed archives, ZIP bombs, path traversal, duplicate entries, oversized uploads, tenant isolation and audit integrity.
 
 ### v0.6 — Static reverse-engineering providers and case workflow
-<badge color="secondary">Planned</badge>
+**Status: Planned**
 
 - Sandboxed, pinned JADX and Apktool/aapt2 providers.
 - DEX class/method/reference navigation and decompilation.
@@ -82,7 +82,7 @@ Open work at the snapshot:
 - Finding confidence, false-positive handling, coverage and report export.
 
 ### v0.7 — Android dynamic assessment foundation
-<badge color="secondary">Planned</badge>
+**Status: Planned**
 
 - Isolated Android assessment worker, separate from FastAPI process.
 - Disposable emulator lifecycle and device identity binding.
@@ -92,7 +92,7 @@ Open work at the snapshot:
 - Mock ADB transport tests and local emulator integration tests.
 
 ### v0.8 — Frida runtime and observation-based Hook Audit
-<badge color="secondary">Planned</badge>
+**Status: Planned**
 
 - Pinned Frida client/server compatibility and device readiness checks.
 - Reviewed, version-controlled, hash-pinned script registry.
@@ -103,7 +103,7 @@ Open work at the snapshot:
 - Local demo APK and disposable emulator integration tests.
 
 ### v0.9 — Protection resilience and patch intelligence
-<badge color="secondary">Planned</badge>
+**Status: Planned**
 
 - Owner-controlled lab builds and documented expected control behavior.
 - Test harness for root/emulator/debugger/instrumentation policy, TLS validation, tamper response and app integrity.
@@ -113,7 +113,7 @@ Open work at the snapshot:
 - No generalized bypass payload library, credential extraction, stealth, persistence, destructive modification, or payment/licensing circumvention.
 
 ### v1.0 — Agent, MCP and controlled execution integration
-<badge color="secondary">Planned</badge>
+**Status: Planned**
 
 - LLM provider abstraction and structured planning outputs.
 - MCP client lifecycle and typed tool registration.
