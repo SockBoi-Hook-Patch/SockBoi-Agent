@@ -38,9 +38,7 @@ def _security_relevant(path: str) -> bool:
     return (
         path == "AndroidManifest.xml"
         or lower.endswith(".dex")
-        or lower.startswith("lib/")
-        or lower.startswith("meta-inf/")
-        or lower.startswith("res/xml/")
+        or lower.startswith(("lib/", "meta-inf/", "res/xml/"))
         or "network_security_config" in lower
     )
 
