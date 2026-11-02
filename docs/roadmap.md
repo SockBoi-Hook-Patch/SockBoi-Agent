@@ -29,6 +29,7 @@ This roadmap distinguishes code merged into `main` from open pull requests, desi
 | Planner / Knowledge | Scope-aware plan and tenant-scoped Markdown keyword search | No integrated LLM agent runtime or vector/hybrid retrieval |
 | Tool registry | Typed tool catalogue | Execution disabled |
 | APK intake | `POST /engagements/{id}/apk/inspect`; bounded ZIP inspection, SHA-256, DEX/native/resource/asset inventory and plain-text XML manifest parsing | No APK persistence/extraction/execution, binary XML decode, DEX decompile, or cryptographic signer verification |
+| APK integrity comparison | `POST /engagements/{id}/apk/compare`; read-only ZIP member SHA-256 comparison, added/removed/changed entries, package identity where plain XML parses, audit event | No APK persistence, semantic DEX diff, binary XML decode, or cryptographic signer verification |
 
 ## Milestones
 
@@ -46,23 +47,17 @@ This roadmap distinguishes code merged into `main` from open pull requests, desi
 ### v0.5 — APK static analysis and artifact integrity
 **Status: In progress**
 
-**Already in main**
+**Implemented in main (PR #8)**
 - Safe APK upload and bounded ZIP inspection.
 - SHA-256 artifact identity and archive inventory.
 - Limited plain-text XML manifest summary.
-- Engagement audit event for inspection.
+- Tenant-scoped, read-only original-versus-modified APK comparison at `/apk/compare`.
+- Added/removed/changed ZIP member report and artifact provenance with audit event.
+- Observation-only Frida Java hook template and Android Control Resilience Skill (playbook only).
 
-**Pending / under review**
-- Read-only original-versus-modified APK archive comparison.
-- Added/removed/changed archive member report and artifact provenance.
-- Observation-only Frida Java hook example and lab control-resilience Skill.
-
-Open work at the snapshot:
-- [PR #5 — APK hook and patch audit foundation](https://github.com/SockBoi-Hook-Patch/SockBoi-Agent/pull/5): open; targets the Android feature branch rather than main; GitHub reported it as not mergeable at the time checked. Resolve/rebase before considering it for mainline.
-- [PR #6 — offline APK patch integrity audit](https://github.com/SockBoi-Hook-Patch/SockBoi-Agent/pull/6): open; targets the Android feature branch; mergeability was reported true, but CI/status checks were not returned by the available status query. Review its diff and validation before merging.
+PR #5 and PR #6 were closed as superseded after their non-overlapping work was consolidated into [PR #8](https://github.com/SockBoi-Hook-Patch/SockBoi-Agent/pull/8), which is merged into `main`.
 
 **Remaining v0.5 work**
-- Reconcile PR #5 and #6 into one canonical patch-audit API/implementation; avoid shipping duplicate endpoints with overlapping purpose.
 - Add durable artifact records if retention is required; current inspect endpoint does not persist uploaded APK bytes.
 - Decode binary AndroidManifest.xml using a pinned, isolated provider.
 - Add DEX/resource/native analysis providers (JADX, Apktool/aapt2, ELF/JNI) with timeouts, output caps and no network by default.
