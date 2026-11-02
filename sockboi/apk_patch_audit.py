@@ -12,6 +12,8 @@ import zipfile
 
 from .apk_inspector import ApkInspectionError, inspect_apk_bytes
 
+MAX_REPORTED_CHANGES = 1000
+
 
 class ApkPatchAuditError(ValueError):
     """Raised when either APK cannot be safely compared."""
@@ -95,6 +97,11 @@ def compare_apk_bytes(original: bytes, patched: bytes) -> dict:
     patched_package = patched_info["package_manifest"].get("package")
     package_status = "same" if original_package == patched_package else "changed_or_unknown"
 
+    all_changes = (
+        describe(added, "added")
+        + describe(removed, "removed")
+        + describe(changed, "changed")
+    )
     return {
         "format": "apk-patch-audit",
         "original": {
@@ -114,11 +121,8 @@ def compare_apk_bytes(original: bytes, patched: bytes) -> dict:
             "changed_count": len(changed),
             "unchanged_count": len(original_names & patched_names) - len(changed),
         },
-        "changes": (
-            describe(added, "added")
-            + describe(removed, "removed")
-            + describe(changed, "changed")
-        ),
+        "changes": all_changes[:MAX_REPORTED_CHANGES],
+        "changes_truncated": len(all_changes) > MAX_REPORTED_CHANGES,
         "signing_comparison": {
             "original_inventory": original_info["signing"],
             "patched_inventory": patched_info["signing"],
