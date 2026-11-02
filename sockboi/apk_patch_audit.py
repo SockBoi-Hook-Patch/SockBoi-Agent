@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import io
 import zipfile
+import zlib
 
 from .apk_inspector import ApkInspectionError, inspect_apk_bytes
 
@@ -37,7 +38,7 @@ def _member_hashes(data: bytes) -> dict[str, dict[str, str | int]]:
                     while chunk := stream.read(1024 * 1024):
                         size += len(chunk)
                         digest.update(chunk)
-            except (zipfile.BadZipFile, RuntimeError, OSError) as exc:
+            except (zipfile.BadZipFile, RuntimeError, OSError, EOFError, zlib.error) as exc:
                 raise ApkPatchAuditError("APK member failed integrity check") from exc
             if size != info.file_size:
                 raise ApkPatchAuditError("APK member size mismatch")
