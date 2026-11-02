@@ -1,74 +1,196 @@
 # SockBoi Agent
 
 **Policy-first AI Security Assessment Platform**  
-แพลตฟอร์มช่วยวางแผน ประเมิน และจัดการงานตรวจสอบความปลอดภัยไซเบอร์ในระบบที่ได้รับอนุญาต โดยให้ Scope, Policy และ Human Approval เป็นตัวควบคุมหลัก
+แพลตฟอร์มสำหรับวางแผนและจัดการ Security Assessment ในระบบที่ได้รับอนุญาต โดยยึด Scope, Deterministic Policy, Human Approval และ Auditability เป็นหลัก
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-blue)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)](https://fastapi.tiangolo.com/) [![Security](https://img.shields.io/badge/Design-Policy--First-informational)](SECURITY.md)
 
-> **สถานะโครงการ: Developer Preview — v0.4 security foundations**
+> **สถานะ ณ 2 พฤศจิกายน 2026: Developer Preview — package version 0.4.0**
 >
-> โค้ดใน branch `feat/v0.4-active-assessment-foundation` มี Authentication, RBAC, Tenant Isolation, SQLAlchemy persistence และ Action-bound Approval foundation แล้ว แต่ยัง **ไม่ใช่เครื่องมือ Pentest ที่สั่ง Scanner หรือยิงทดสอบเครือข่ายได้จริง** และยังไม่พร้อมใช้ Production
+> `main` มี security foundation และ APK static ZIP inspection endpoint แล้ว ส่วน ADB/Frida runtime, APK decompilation, patch generation, live bypass testing, scanner execution, MCP runtime และ LLM orchestration ยังไม่ใช่ความสามารถที่เปิดใช้งานจริง
 >
-> หมายเหตุ: เวอร์ชันแพ็กเกจใน branch นี้คือ `0.4.0`; การ Merge PR ไม่ได้สร้าง GitHub Release หรือ tag ให้อัตโนมัติ
+> Version ใน `pyproject.toml` คือ `0.4.0` การ Merge PR ไม่ได้สร้าง release/tag ให้อัตโนมัติ
 
 ---
 
-## สารบัญ | Contents
+## Contents
 
 - [ภาษาไทย](#ภาษาไทย)
-  - [SockBoi Agent คืออะไร](#sockboi-agent-คืออะไร)
-  - [ทำอะไรได้บ้างในปัจจุบัน](#ความสามารถที่มีในโค้ดปัจจุบัน)
-  - [สถาปัตยกรรม](#สถาปัตยกรรม)
-  - [ติดตั้งและเริ่มใช้งาน](#ติดตั้งและเริ่มใช้งาน)
-  - [ตั้งค่า API Authentication](#ตั้งค่า-api-authentication)
-  - [Workflow การใช้งาน](#workflow-การใช้งาน)
-  - [ตัวอย่าง Prompt สำหรับ AI](#ตัวอย่าง-prompt-สำหรับ-ai)
-  - [API Endpoints](#api-endpoints)
-  - [ข้อจำกัดและ Roadmap](#ข้อจำกัดและ-roadmap)
 - [English](#english)
-- [Security](#security)
-- [Contributing](#contributing)
+- [Security model](#security-model)
+- [Roadmap](docs/roadmap.md)
+- [Architecture](docs/architecture.md)
+- [Android APK roadmap](docs/apk-reverse-engineering-roadmap.md)
+- [Contributing](CONTRIBUTING.md)
 
 # ภาษาไทย
 
 ## SockBoi Agent คืออะไร
 
-SockBoi Agent คือ **Control Plane สำหรับงาน Security Assessment ที่ได้รับอนุญาต** ไม่ใช่เครื่องมือโจมตีอัตโนมัติแบบ unrestricted จุดประสงค์คือช่วยเปลี่ยนคำขอประเมินความปลอดภัยให้เป็นแผนงานที่ตรวจสอบได้ โดยมีขอบเขตและสิทธิ์ที่ชัดเจนตั้งแต่ต้นจนจบ
+SockBoi Agent คือ **Control Plane สำหรับ Security Assessment ที่ได้รับอนุญาต** ช่วยจัดการ Engagement, Asset Scope, Assessment Plan, Approval, Findings และ Audit Evidence โดยออกแบบให้ AI หรือ Skill ไม่สามารถอนุมัติ Action หรือขยายขอบเขตเองได้
 
-แนวคิดสำคัญคือแยกหน้าที่ระหว่าง:
+องค์ประกอบหลัก:
 
-1. **AI / Agent** — ช่วยทำความเข้าใจคำขอ เสนอแผน จัดหมวดหมู่ความเสี่ยง และสรุปผล
-2. **Policy Engine** — ตรวจสอบ Scope และเงื่อนไขการอนุญาตด้วยกฎที่กำหนดแน่นอน ไม่ให้ AI เปลี่ยนกฎเอง
-3. **Human Approval** — ผู้มีสิทธิ์ตรวจสอบและอนุมัติ Action ที่มีความเสี่ยงก่อนนำไปใช้
-4. **Execution Adapter** — ส่วนเชื่อมต่อเครื่องมือภายนอกที่ต้องถูกจำกัดสิทธิ์และผ่าน Policy Gate (ยังไม่เปิดใช้งานในรุ่นนี้)
+1. **Agent / Planner** — ช่วยจัดโครงสร้างแผนและข้อเสนอการตรวจสอบ ปัจจุบันยังไม่มี integrated LLM runtime
+2. **Policy Engine** — ตรวจ Scope, Risk และเงื่อนไขการอนุญาต
+3. **Human Approval** — ผู้มีสิทธิ์ตรวจสอบ Action ก่อนดำเนินการที่มีความเสี่ยง
+4. **Tool Registry / Adapters** — เก็บ typed tool definitions; live execution adapters ยังไม่เปิดใช้งาน
+5. **Evidence / Audit** — บันทึกผลและตรวจสอบความถูกต้องของ Audit Chain
 
-**หลักการ:** AI เสนอได้ แต่ไม่มีสิทธิ์อนุมัติตัวเองหรือข้าม Scope/Policy
+## สถานะความสามารถใน `main`
 
-## ความสามารถที่มีในโค้ดปัจจุบัน
-
-| ส่วนประกอบ | สถานะ | รายละเอียด |
+| ความสามารถ | สถานะ | ขอบเขตปัจจุบัน |
 |---|---|---|
-| Assessment Planner | มี | สร้างแผนประเมินจาก Engagement และ Target ที่อยู่ใน Scope |
-| Engagement Management | มี | สร้าง/อ่าน Engagement พร้อม Authorization Reference และ Asset Scope |
-| Scope Validation | มี | ตรวจ Target เทียบกับ Asset ที่ได้รับอนุญาต |
-| API Key Authentication | มี | Bearer API key ตรวจสอบกับ SHA-256 digest ที่ตั้งค่าฝั่ง Server |
-| RBAC | มี | แยกสิทธิ์ตาม role เช่น admin, operator และ reviewer ใน endpoint ที่กำหนด |
-| Tenant Isolation | มี | ผูก Engagement กับ tenant จาก Principal และป้องกันการอ่านข้าม tenant |
-| SQLAlchemy Store | มี | จัดเก็บ Engagement, Approval, Finding และ Audit Event ผ่าน SQLAlchemy |
-| Action-bound Approval | มี | ผูก Approval กับ Engagement, Tenant, Target, Adapter, Technique, Parameters และ Risk ด้วย SHA-256 digest |
-| One-time Approval Consume | มี | ตรวจ digest, สถานะ, อายุอนุมัติ และป้องกันการ consume ซ้ำด้วย database conditional update |
-| Knowledge Ingestion | มี | นำเข้า Markdown และค้นหาด้วยคำสำคัญ |
-| Typed Tool Registry | มี | แสดงรายการเครื่องมือและ schema; ปิดการ execute |
-| Findings | มี | บันทึก Finding ที่ผูกกับ Engagement และตรวจ Scope |
-| Audit Events | มี | บันทึกเหตุการณ์สำคัญของระบบ |
-| Evidence Hash | มี | คำนวณ SHA-256 โดยไม่เก็บเนื้อหาหลักฐาน |\n| APK ZIP Inspection | มี (static triage) | `POST /engagements/{id}/apk/inspect` ตรวจ ZIP, hash, DEX/native inventory และ plain XML manifest; ไม่เก็บ APK หรือ execute code |
-| Hash-chain Audit Integration | มี | บันทึกแบบ Hash Chain, ตรวจสอบได้ และมี Checkpoint แยกตาม Engagement |
-| LLM Runtime | ยังไม่มี | ยังไม่มีการเชื่อม Provider เพื่อให้ LLM ทำงานใน API flow |
-| MCP Runtime / Scanner Execution | ยังไม่มี | ยังไม่มีการเรียก MCP Server, Nmap, ZAP หรือ Scanner จริง |
+| FastAPI service | Implemented | API service และ health endpoint |
+| API-key authentication | Implemented | Bearer key ตรวจจาก SHA-256 digest ฝั่ง Server; fail-closed |
+| RBAC | Implemented | Role checks ใน endpoint ที่กำหนด |
+| Tenant isolation | Implemented | Principal-bound tenant สำหรับ Engagement และ Knowledge; APK inspect ตรวจ tenant ผ่าน Engagement |
+| Engagement / Scope | Implemented | สร้างและอ่าน Engagement พร้อม asset scope |
+| Assessment Planner | Implemented | สร้างแผนจาก Engagement และ target ใน scope; ไม่ใช่ LLM agent |
+| Action-bound Approval | Implemented | ผูก approval กับ Engagement, Tenant, Target, Adapter, Technique, Parameters และ Risk |
+| One-time approval consume | Implemented | ตรวจ envelope/expiry และป้องกัน consume ซ้ำ; ไม่ได้ execute action |
+| SQLAlchemy persistence | Implemented | จัดเก็บ Engagement, Approval, Finding และ Audit Event; ยังใช้ `create_all` |
+| Audit hash chain | Implemented | Engagement-scoped verification และ HMAC checkpoint export |
+| Markdown Knowledge | Implemented | Tenant-scoped ingestion และ keyword search; เนื้อหาเป็น untrusted input |
+| Typed Tool Catalog | Implemented | แสดง tool/schema แต่ execution ถูกปิด |
+| Findings / Evidence hash | Implemented | จัดเก็บ Finding และคำนวณ SHA-256 digest โดยไม่เก็บ evidence content ผ่าน hash endpoint |
+| APK static inspection | Implemented | Upload APK แบบ bounded; ZIP safety checks, SHA-256, DEX/native/resource inventory และ parse plain-text XML manifest |
+| APK patch comparison | Planned / PR review | ยังไม่อยู่ใน `main`; byte-level archive diff และ patch audit อยู่ระหว่างพัฒนา |
+| JADX / Apktool / binary manifest | Planned | ยังไม่มี decompilation หรือ binary XML decoder |
+| APK signer verification | Planned | การพบ META-INF signature files ไม่ใช่การยืนยันลายเซ็นเชิงคริปโต |
+| ADB / Emulator Manager | Skill / Design only | ยังไม่มี live ADB adapter หรือ disposable emulator manager |
+| Frida / Runtime Hook | Skill / Template only | ยังไม่มี live Frida runtime; ตัวอย่าง hook ไม่ได้ถูกรันโดย API |
+| Protection resilience / bypass audit | Design / Lab workflow | ยังไม่มี automated runtime test harness |
+| Patch generation / APK repackaging | Not implemented | ไม่มีระบบแก้ไข/repackage/re-sign APK |
+| LLM / MCP / Scanner execution | Not implemented | ไม่มี integrated LLM, MCP client หรือ Nmap/ZAP/Browser execution |
 
-### Approval ทำงานอย่างไร
+**ข้อควรเข้าใจ:** การมี Skill, playbook, script template หรือ roadmap ไม่ได้หมายความว่า Agent เรียกใช้เครื่องมือนั้นได้จริง ต้องมี adapter, worker isolation, tests และ CI ผ่านก่อนจึงนับเป็น executable capability
 
-Approval ไม่ได้อนุมัติแบบกว้าง ๆ แต่ผูกกับ Action Envelope ที่ประกอบด้วย:
+## APK Static Inspection API
+
+Endpoint:
+
+`POST /engagements/{engagement_id}/apk/inspect`
+
+- Authentication: Bearer API key
+- Required role: `admin` หรือ `operator`
+- Multipart field: `file`
+- ตรวจว่าเป็น ZIP-based APK และบังคับ size/archive safety limits
+- คำนวณ SHA-256 และแสดงขนาด/จำนวน archive entries
+- แสดงรายการ DEX, native libraries, resources และ assets
+- อ่าน Manifest ได้เฉพาะกรณีเป็น plain-text XML; binary Android XML จะระบุว่าไม่รองรับการ decode
+- บันทึก audit event ที่ผูกกับ Engagement
+- ไม่ extract ไฟล์ลง disk, ไม่เก็บ APK ต้นฉบับ และไม่ execute app code
+
+ตัวอย่าง:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/engagements/<ENGAGEMENT_ID>/apk/inspect" \
+  -H "Authorization: Bearer <OPERATOR_API_KEY>" \
+  -F "file=@./sample.apk"
+```
+
+ใช้เฉพาะ APK ที่ได้รับอนุญาตให้ตรวจสอบ และอย่าอัปโหลด APK ที่มีข้อมูลลับหรือข้อมูลส่วนบุคคลโดยไม่มีฐานสิทธิ์และมาตรการจัดการข้อมูลที่เหมาะสม
+
+## Architecture
+
+```text
+User / Analyst
+      |
+FastAPI + API-key Authentication
+      |
+RBAC + Tenant Boundary
+      |
+Engagement + Asset Scope
+      |
+Assessment Planner
+      |
+Deterministic Policy + Human Approval
+      |
+Typed Tool Catalog (execution disabled)
+      |
+Future isolated workers / adapters
+
+SQLAlchemy Store ---- Audit Hash Chain
+Knowledge / Skills -- untrusted reference input
+APK upload ---------- bounded static ZIP inspection
+```
+
+ดูเอกสาร: [Architecture](docs/architecture.md) · [Agent](agent/README.md) · [Skills](skills/README.md) · [MCP](mcp/README.md) · [Roadmap](docs/roadmap.md)
+
+## ติดตั้งและเริ่มใช้งาน
+
+### Requirements
+
+- Python 3.12+
+- pip และ Git
+- SQLite สำหรับทดลอง หรือ PostgreSQL สำหรับการพัฒนาแบบหลายผู้ใช้
+
+### 1. Clone และติดตั้ง
+
+```bash
+git clone https://github.com/SockBoi-Hook-Patch/SockBoi-Agent.git
+cd SockBoi-Agent
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/SockBoi-Hook-Patch/SockBoi-Agent.git
+cd SockBoi-Agent
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+### 2. ตั้งค่า API Authentication
+
+ระบบอ่าน `SOCKBOI_API_KEYS` เป็น JSON array โดยแต่ละ principal ต้องมี `key_sha256`, `subject`, `tenant_id` และ `roles` ระบบไม่เก็บ API key แบบ plaintext ใน keyring
+
+สร้าง key และ digest:
+
+```bash
+python -c "import secrets,hashlib; k=secrets.token_urlsafe(32); print('API_KEY='+k); print('KEY_SHA256='+hashlib.sha256(k.encode()).hexdigest())"
+```
+
+ตั้งค่า Environment Variable โดยแทน placeholder ด้วย digest จริง:
+
+```bash
+export SOCKBOI_API_KEYS='[{"key_sha256":"<OPERATOR_SHA256>","subject":"security-operator","tenant_id":"tenant-lab","roles":["operator"]},{"key_sha256":"<REVIEWER_SHA256>","subject":"security-reviewer","tenant_id":"tenant-lab","roles":["reviewer"]}]'
+```
+
+สำหรับ Audit Checkpoint ให้ตั้ง `SOCKBOI_AUDIT_CHECKPOINT_KEY` เป็น secret แยกต่างหากและเก็บไว้นอก Git/Database
+
+### 3. เริ่ม API
+
+```bash
+uvicorn sockboi.main:app --reload
+```
+
+- Swagger UI: http://127.0.0.1:8000/docs
+- Health: http://127.0.0.1:8000/health
+
+ทุก endpoint ยกเว้น `GET /health` ต้องมี Bearer API key ที่ถูกต้อง ใช้ `--reload` เฉพาะ local development เท่านั้น
+
+### Docker Compose
+
+```bash
+cp .env.example .env
+# ตั้ง POSTGRES_PASSWORD และ SOCKBOI_API_KEYS ใน .env
+docker compose up --build -d
+docker compose logs -f api
+```
+
+ห้าม commit `.env`, API keys, checkpoint secrets หรือข้อมูลลูกค้าลง Git
+
+## Approval model
+
+Approval เป็น Action-bound ไม่ใช่ blanket approval โดยผูกกับ:
 
 - Engagement ID และ Tenant ID
 - Target
@@ -76,359 +198,43 @@ Approval ไม่ได้อนุมัติแบบกว้าง ๆ แ
 - Parameters
 - Risk level
 
-ระบบคำนวณ SHA-256 digest จากข้อมูลเหล่านี้ เมื่อขอใช้ Approval ต้องส่ง Envelope ที่ตรงกับต้นฉบับทุกส่วน การเปลี่ยน Target, Technique, Adapter หรือ Parameters จะทำให้ digest ไม่ตรงและถูกปฏิเสธ
+Approval ที่อนุมัติแล้วมีอายุ 15 นาทีและ consume ได้ครั้งเดียว ผู้ร้องขอไม่สามารถอนุมัติคำขอของตัวเองได้ การ consume เป็นเพียงการบันทึก/ตรวจสิทธิ์ ไม่ได้เรียก network หรือรันเครื่องมือ
 
-Approval ที่อนุมัติแล้วมีอายุ **15 นาที** และ consume ได้ครั้งเดียว ผู้ร้องขอไม่สามารถอนุมัติคำขอของตัวเองได้ การเรียก `/approvals/{id}/consume` เป็นเพียงการใช้สิทธิ์อนุมัติ ไม่ได้ส่งคำขอเครือข่ายหรือรันเครื่องมือใด ๆ
+## API endpoints
 
-## สถาปัตยกรรม
-
-```mermaid
-flowchart TD
-    U[User / Security Analyst] --> API[FastAPI]
-    API --> AUTH[API Key Authentication]
-    AUTH --> RBAC[RBAC + Tenant Boundary]
-    RBAC --> ENG[Engagement + Scope]
-    ENG --> PLAN[Assessment Planner]
-    PLAN --> POLICY[Deterministic Policy Engine]
-    POLICY --> APPROVAL[Human Approval Gate]
-    APPROVAL --> CATALOG[Typed Tool Registry]
-    CATALOG -. execution disabled .-> ADAPTER[Future Isolated Adapter]
-    API --> DB[(SQLAlchemy Database)]
-    API --> AUDIT[Audit Events]
-    KNOW[Untrusted Knowledge / Skills] --> PLAN
-```
-
-### ส่วนประกอบหลัก
-
-- **Agent Core:** ประสานงานและสร้างแผนการประเมิน ปัจจุบัน Planner เป็น logic ในแอป ไม่ใช่ LLM agent runtime ที่เชื่อมโมเดลภายนอก
-- **Skills / Knowledge:** เก็บ playbook และเอกสารอ้างอิง Markdown เนื้อหาที่นำเข้าถือเป็น Untrusted Input เสมอ
-- **MCP / Tool Registry:** ระบุเครื่องมือและ input schema ที่ระบบรู้จัก ปัจจุบันเป็น Catalog เท่านั้น
-- **Policy Layer:** ตรวจ Scope, Risk และ Approval โดยไม่เชื่อคำสั่งจาก Knowledge หรือ Model Output
-- **Storage:** SQLAlchemy ใช้กับข้อมูลหลักของ Engagement, Approval, Finding และ Audit Event; การตั้งค่า schema ปัจจุบันใช้ `create_all` ยังไม่มี Alembic migration workflow
-
-ดูรายละเอียดเพิ่มเติม: [Agent](agent/README.md) · [Skills](skills/README.md) · [MCP](mcp/README.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
-
-## ติดตั้งและเริ่มใช้งาน
-
-### ความต้องการ
-
-- Python **3.12 หรือใหม่กว่า**
-- pip
-- Git
-- ฐานข้อมูลที่ SQLAlchemy รองรับ (SQLite เหมาะกับการทดลอง; PostgreSQL เหมาะกับการพัฒนาแบบหลายผู้ใช้)
-
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/SockBoi-Hook-Patch/SockBoi-Agent.git
-cd SockBoi-Agent
-git checkout feat/v0.4-active-assessment-foundation
-```
-
-หากต้องการใช้ branch หลัก ให้ตัดคำสั่ง checkout ออก แต่ความสามารถอาจต่างจาก branch ที่ระบุในเอกสารนี้
-
-### 2. สร้าง Virtual Environment
-
-Linux / macOS:
-
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-```
-
-Windows PowerShell:
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-### 3. ติดตั้ง Dependencies
-
-```bash
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-```
-
-### 4. ตั้งค่า API Key
-
-API ทุก endpoint ยกเว้น `GET /health` ต้องมี Bearer API key ที่ถูกต้อง หากยังไม่ตั้งค่า Keyring ระบบจะ fail closed และตอบกลับว่า Authentication ยังไม่ได้ตั้งค่า
-
-ดูวิธีสร้าง Keyring ในหัวข้อ [ตั้งค่า API Authentication](#ตั้งค่า-api-authentication)
-
-### 5. เริ่ม API Server
-
-```bash
-uvicorn sockboi.main:app --reload
-```
-
-เปิดเอกสาร API แบบ Interactive ได้ที่:
-
-- Swagger UI: http://127.0.0.1:8000/docs
-- Health Check: http://127.0.0.1:8000/health
-
-> ใช้ `--reload` เฉพาะเครื่องพัฒนาเท่านั้น อย่าเปิด Development Server ออกอินเทอร์เน็ต
-
-### เริ่มด้วย Docker Compose
-
-สำหรับ PostgreSQL deployment แบบทดลอง:
-
-```bash
-cp .env.example .env
-# แก้ POSTGRES_PASSWORD และ SOCKBOI_API_KEYS ใน .env ก่อน
-docker compose up --build -d
-docker compose logs -f api
-```
-
-Compose จะปฏิเสธการเริ่มฐานข้อมูลหากยังไม่ได้กำหนด `POSTGRES_PASSWORD`; API จะ fail closed จนกว่าจะตั้งค่า API key อย่างน้อยหนึ่งรายการใน `SOCKBOI_API_KEYS`. Redis ไม่ถูกรันโดย default เพราะ API รุ่นนี้ยังไม่ได้ใช้งาน Redis. ZAP อยู่ใน profile `scanner-lab` เท่านั้นและไม่ได้เชื่อมต่อกับ API execution.
-
-## ตั้งค่า API Authentication
-
-ระบบอ่านตัวแปรแวดล้อม `SOCKBOI_API_KEYS` เป็น JSON Array แต่ละรายการต้องมี:
-
-- `key_sha256`: SHA-256 hex digest ของ API key จริง
-- `subject`: ชื่อ Principal/ผู้ใช้งาน
-- `tenant_id`: Tenant ที่ผู้ใช้งานสังกัด
-- `roles`: Array ของ role
-
-### สร้าง API Key และ Digest
-
-ตัวอย่างสร้าง Key แบบสุ่มและคำนวณ digest ด้วย Python:
-
-```bash
-python -c "import secrets,hashlib; k=secrets.token_urlsafe(32); print('API_KEY='+k); print('KEY_SHA256='+hashlib.sha256(k.encode()).hexdigest())"
-```
-
-เก็บค่า `API_KEY` ไว้เป็นความลับ และนำเฉพาะค่า `KEY_SHA256` ไปใส่ใน Keyring ตัวอย่างด้านล่างใช้ค่า placeholder ต้องแทนด้วย digest จริง:
-
-```json
-[
-  {
-    "key_sha256": "<64-character-lowercase-sha256-hex>",
-    "subject": "security-operator",
-    "tenant_id": "tenant-lab",
-    "roles": ["operator"]
-  },
-  {
-    "key_sha256": "<another-64-character-sha256-hex>",
-    "subject": "security-reviewer",
-    "tenant_id": "tenant-lab",
-    "roles": ["reviewer"]
-  }
-]
-```
-
-หากต้องการใช้ Audit Checkpoint ให้สร้าง Secret แยกต่างหากด้วย `python -c "import secrets; print(secrets.token_urlsafe(48))"` แล้วตั้งค่า `SOCKBOI_AUDIT_CHECKPOINT_KEY` เก็บไว้ภายนอก Git และ Database\n\nตั้งค่า Environment Variable ก่อนเปิด Server
-
-Linux / macOS:
-
-```bash
-export SOCKBOI_API_KEYS='[{"key_sha256":"<OPERATOR_SHA256>","subject":"security-operator","tenant_id":"tenant-lab","roles":["operator"]},{"key_sha256":"<REVIEWER_SHA256>","subject":"security-reviewer","tenant_id":"tenant-lab","roles":["reviewer"]}]'
-```
-
-Windows PowerShell:
-
-```powershell
-$env:SOCKBOI_API_KEYS='[{"key_sha256":"<OPERATOR_SHA256>","subject":"security-operator","tenant_id":"tenant-lab","roles":["operator"]},{"key_sha256":"<REVIEWER_SHA256>","subject":"security-reviewer","tenant_id":"tenant-lab","roles":["reviewer"]}]'
-```
-
-เรียก API โดยใช้ **API key จริง** ไม่ใช่ digest:
-
-```bash
-curl http://127.0.0.1:8000/engagements \
-  -H "Authorization: Bearer YOUR_OPERATOR_API_KEY"
-```
-
-### Roles ที่ใช้งานใน API
-
-| Role | สิทธิ์โดยสรุป |
-|---|---|
-| `admin` | สิทธิ์ระดับผู้ดูแลใน endpoint ที่รองรับ |
-| `operator` | สร้าง Engagement, ขอ Approval และสร้าง Finding |
-| `reviewer` | ตัดสินคำขอ Approval |
-| role อื่น | อ่านได้เฉพาะ endpoint ที่ไม่กำหนด role เพิ่ม แต่ยังต้องผ่าน Authentication และ Tenant Boundary |
-
-สิทธิ์จริงถูกกำหนดที่แต่ละ endpoint ไม่ควรตีความตารางนี้ว่าเป็น Permission Matrix ที่ครอบคลุมทุกกรณี
-
-**อย่า commit API key จริง, .env, digest ที่ไม่ควรเปิดเผย, หรือข้อมูลลูกค้าลง Git**
-
-## Workflow การใช้งาน
-
-1. **เตรียม Authorization:** ยืนยันว่ามีหนังสืออนุญาตหรือหลักฐานสิทธิ์ตรวจสอบ และกำหนดช่วงเวลา/ข้อจำกัดของงาน
-2. **สร้าง Engagement:** ใส่ Authorization Reference และ Asset Scope ให้ชัดเจน
-3. **สร้าง Assessment Plan:** ส่ง Engagement ID และ Target ที่อยู่ใน Scope ให้ Planner
-4. **ทบทวนแผน:** ตรวจ Target, เทคนิค, ความเสี่ยง และผลกระทบที่อาจเกิดขึ้น
-5. **ขอ Approval:** ส่ง Action ที่ระบุ Target, Adapter, Technique, Parameters และ Risk
-6. **ให้ Reviewer ตัดสิน:** Reviewer ต้องเป็น Principal แยกจากผู้ร้องขอ
-7. **ตรวจ Policy / Consume Approval:** ตรวจว่าข้อมูล Action ตรงกับที่อนุมัติและยังไม่หมดอายุ
-8. **บันทึก Finding และ Audit:** จัดเก็บผลที่ตรวจพบ พร้อมแยกข้อเท็จจริงออกจากข้อสันนิษฐาน
-
-> ในรุ่นปัจจุบัน Workflow นี้เป็นการจัดการแผน สิทธิ์ และข้อมูลผ่าน API เท่านั้น การ Consume Approval ไม่ได้ execute Active Check
-
-## ตัวอย่าง Prompt สำหรับ AI
-
-Prompt เหล่านี้เป็น **ตัวอย่างแนวทางการสั่ง AI ภายนอกหรือผู้ช่วยนักวิเคราะห์** ไม่ใช่คำสั่งที่ระบบมี LLM Runtime รับไป execute อัตโนมัติในตอนนี้ ควรให้ AI สร้างผลลัพธ์ที่มนุษย์ตรวจสอบได้ และส่งข้อมูลเข้า API ผ่านขั้นตอนที่กำหนด
-
-### 1. วางแผนประเมินแบบ Passive
-
-```text
-คุณคือผู้ช่วยวางแผน Security Assessment
-
-เป้าหมาย: [ระบุ Domain / IP / Asset]
-Engagement ID: [ระบุ ID]
-ขอบเขตที่ได้รับอนุญาต: [วาง Scope ที่ยืนยันแล้ว]
-ข้อจำกัด: Passive assessment เท่านั้น ห้ามส่งคำขอทดสอบไปยังเป้าหมาย
-
-งานที่ต้องทำ:
-1. สรุปขอบเขตและข้อจำกัด
-2. เสนอรายการตรวจสอบจากข้อมูลที่ให้มาเท่านั้น
-3. จัดลำดับตามความเสี่ยงและความสำคัญ
-4. ระบุข้อมูลที่ยังขาดและสิ่งที่ต้องขออนุญาตเพิ่ม
-5. แยกข้อเท็จจริง สมมติฐาน และข้อเสนอแนะ
-6. ห้ามแต่งผลการตรวจหรืออ้างว่าทดสอบแล้ว
-
-ส่งผลลัพธ์เป็น JSON:
-{
-  "scope_summary": "...",
-  "assumptions": [],
-  "checks": [
-    {
-      "name": "...",
-      "target": "...",
-      "technique": "...",
-      "risk": "passive",
-      "evidence_required": [],
-      "approval_required": false
-    }
-  ],
-  "out_of_scope": [],
-  "open_questions": []
-}
-```
-
-### 2. เสนอแผน Active HTTP Inspection (ยังไม่ execute)
-
-```text
-ช่วยออกแบบแผนตรวจสอบ HTTP Security Configuration สำหรับ Asset
-ที่อยู่ใน Engagement Scope และได้รับอนุญาตอย่างชัดเจนเท่านั้น
-
-ข้อกำหนด:
-- เสนอเฉพาะ HTTP GET แบบ read-only
-- ห้าม POST, PUT, PATCH, DELETE
-- ห้าม brute force, fuzzing, DoS หรือ exploit
-- ห้ามตาม Redirect ไปยัง Host อื่นโดยอัตโนมัติ
-- ระบุ Target, Adapter ID, Technique ID และ Parameters ให้ชัด
-- ระบุเหตุผลและ Risk ของแต่ละ Action
-- ระบุ Approval ที่ต้องได้รับก่อนทำงาน
-- ถ้า Scope ไม่ชัดเจน ให้หยุดและถาม ไม่เดาเอง
-
-สำคัญ: ตอนนี้ให้สร้างแผนและ Action Schema เท่านั้น
-ห้ามอ้างว่าได้ส่ง HTTP Request หรือพบช่องโหว่แล้ว
-```
-
-### 3. วิเคราะห์ Findings และจัดทำรายงาน
-
-```text
-คุณคือ Security Analyst
-
-วิเคราะห์ Findings และ Evidence ที่แนบมา โดย:
-1. จัดกลุ่มตาม Asset และประเภทช่องโหว่
-2. ประเมิน Severity พร้อมเหตุผล
-3. อธิบายผลกระทบทางธุรกิจและ Technical Impact
-4. เสนอแนวทางแก้ไขที่ตรวจสอบได้
-5. ระบุ Evidence ที่รองรับแต่ละข้อ
-6. แยก Confirmed Finding, Potential Finding และ False Positive
-7. ห้ามสร้าง Evidence, URL, CVE หรือผลการทดสอบขึ้นเอง
-8. ถ้าข้อมูลไม่พอ ให้ระบุว่า "ยังยืนยันไม่ได้"
-
-รูปแบบรายงาน:
-- Executive Summary
-- Scope and Methodology
-- Findings by Severity
-- Evidence
-- Remediation
-- Limitations
-- Retest Recommendations
-```
-
-### 4. ตรวจสอบ Scope และ Approval ก่อนเสนอ Action
-
-```text
-ตรวจ Action Schema ต่อไปนี้ก่อนส่งให้ผู้ตรวจสอบ:
-
-[วาง Action Schema]
-
-ตรวจว่า:
-- Target อยู่ใน Engagement Scope หรือไม่
-- Action มีความเสี่ยงระดับใด
-- มี Adapter และ Technique ที่ระบุชัดหรือไม่
-- Parameters มีความจำเป็นและจำกัดขอบเขตหรือไม่
-- ต้องใช้ Human Approval หรือไม่
-- มีความเสี่ยงต่อข้อมูลหรือความพร้อมใช้งานหรือไม่
-
-หากข้อมูลใดไม่ชัดเจน ให้ปฏิเสธการเสนอ Action และอธิบายเหตุผล
-ห้ามลดระดับ Risk เพื่อให้ผ่าน Approval
-```
-
-### หลักการเขียน Prompt ให้ปลอดภัย
-
-- ระบุ Engagement และ Scope ที่ได้รับอนุญาตทุกครั้ง
-- ระบุว่าให้ทำ Planning, Analysis หรือ Execution (เมื่อมีระบบรองรับ) ให้ชัด
-- ระบุข้อห้ามและข้อจำกัดด้านผลกระทบ
-- บังคับให้ AI แยก Evidence ออกจาก Assumption
-- ให้ AI ส่ง Structured Output ที่ตรวจสอบได้
-- อย่าใส่ Secret, API Key หรือข้อมูลส่วนบุคคลลงใน Prompt โดยไม่จำเป็น
-
-## API Endpoints
-
-API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก endpoint ยกเว้น `GET /health`
-
-| Method | Endpoint | หน้าที่ |
+| Method | Endpoint | รายละเอียด |
 |---|---|---|
-| GET | `/health` | Health check และเวอร์ชัน |
-| POST | `/engagements` | สร้าง Engagement (admin/operator) |
-| GET | `/engagements` | แสดง Engagement ใน Tenant ของผู้เรียก |
-| GET | `/engagements/{id}` | อ่าน Engagement ที่เข้าถึงได้ |
-| POST | `/engagements/{id}/plan?target=...` | สร้าง Assessment Plan |
-| POST | `/engagements/{id}/approvals` | ขอ Action-bound Approval (admin/operator) |
-| POST | `/approvals/{id}/decide?approved=true` | อนุมัติ/ปฏิเสธ (admin/reviewer) |
-| POST | `/approvals/{id}/consume?engagement_id=...` | Consume Approval แบบ one-time; ไม่ execute Action |
-| POST | `/policy/check` | ตรวจ Scope, Risk และ Approval |
-| POST | `/findings` | สร้าง Finding (admin/operator) |
-| GET | `/engagements/{id}/audit` | อ่าน Audit Events ของ Engagement |
-| GET | `/engagements/{id}/audit/verify` | ตรวจสอบ Audit Chain ของ Engagement (admin/reviewer) |
-| GET | `/engagements/{id}/audit/checkpoint` | สร้าง HMAC checkpoint สำหรับส่งไปเก็บภายนอก (admin/reviewer) |
-| POST | `/knowledge/ingest` | นำเข้า Markdown แบบ Tenant-scoped (admin/operator) |
-| GET | `/knowledge/search?query=...` | ค้นหา Knowledge ภายใน Tenant ของผู้เรียก |
-| GET | `/tools` | ดู Typed Tool Catalog (execution disabled) |
-| POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |\n| POST | `/engagements/{id}/apk/inspect` | Upload APK แบบ tenant-scoped เพื่อ static ZIP inventory และ manifest XML แบบ text; ไม่เก็บไฟล์ต้นฉบับ |
+| GET | `/health` | Health check และ version |
+| POST | `/engagements` | สร้าง Engagement |
+| GET | `/engagements` | อ่าน Engagement ใน Tenant |
+| GET | `/engagements/{id}` | อ่าน Engagement |
+| POST | `/engagements/{id}/plan` | สร้าง Assessment Plan |
+| POST | `/engagements/{id}/approvals` | ขอ Action-bound Approval |
+| POST | `/approvals/{id}/decide` | Reviewer ตัดสิน Approval |
+| POST | `/approvals/{id}/consume` | Consume Approval; ไม่ execute |
+| POST | `/policy/check` | ตรวจ Scope / Risk / Approval |
+| POST | `/findings` | บันทึก Finding |
+| GET | `/engagements/{id}/audit` | อ่าน Audit Events |
+| GET | `/engagements/{id}/audit/verify` | ตรวจ Audit Chain |
+| GET | `/engagements/{id}/audit/checkpoint` | สร้าง HMAC checkpoint |
+| POST | `/knowledge/ingest` | นำเข้า Markdown |
+| GET | `/knowledge/search` | ค้นหา Knowledge |
+| GET | `/tools` | ดู Typed Tool Catalog |
+| POST | `/evidence/hash` | คำนวณ SHA-256 |
+| POST | `/engagements/{id}/apk/inspect` | ตรวจ APK แบบ static ZIP inventory |
 
-ดู Request/Response Schema แบบเต็มและทดลองเรียกได้ที่ Swagger UI: `/docs`
+Request/response schema ที่แน่นอนให้ดู Swagger UI ที่ `/docs`
 
-## ข้อจำกัดและ Roadmap
+## Roadmap
 
-### สิ่งที่ยังไม่มี / ห้ามเข้าใจว่าทำได้แล้ว
+ดู [docs/roadmap.md](docs/roadmap.md) สำหรับ milestone และสถานะล่าสุด ภาพรวมลำดับงาน Android:
 
-- ไม่มี LLM Provider หรือ Prompt-to-Action Runtime ที่เชื่อมใน API
-- ไม่มีการ execute Nmap, Nuclei, ZAP, Browser หรือ MCP tools
-- ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง\n- APK inspection ยังเป็น static ZIP inventory เท่านั้น; ยังไม่มี JADX/Apktool execution, binary manifest decoder, DEX decompilation, signature verification, ADB/Frida runtime adapters
-- Approval Consume เป็นการใช้สิทธิ์ ไม่ใช่การรัน Network Action
-- Database schema ใช้ SQLAlchemy `create_all`; ยังไม่มี Alembic migration workflow
-- ยังไม่มี Alembic migrations, automatic external checkpoint export, approval revocation endpoint หรือ PostgreSQL multi-process integration tests
-- ยังต้องทำ production security review, parameter schema allowlist และ hardening ของ deployment ก่อนเปิด execution
-- ยังไม่ผ่านการรับรอง Production Security Review
-
-### Roadmap
-
-| ระยะ | เป้าหมาย |
-|---|---|
-| v0.4 | Authentication, RBAC, Tenant Isolation, Durable Store, Action-bound Approval และ API foundation |
-| v0.5 | Isolated Worker และ HTTP GET-only security configuration inspection พร้อม DNS pinning, redirect controls, SSRF protection, egress allowlist, timeout และ rate limit |
-| v0.6 | Versioned Skills, provenance, safe ingestion และ prompt-injection isolation |
-| v0.7 | MCP Runtime แบบ typed allowlist พร้อม Policy Gate, timeout และ cancellation |
-| v0.8 | LLM orchestration, structured output และ evaluation suite โดย Policy Engine ยังคงเป็นผู้ตัดสินสิทธิ์ |
-
-รายการใน Roadmap คือแผนพัฒนา ไม่ใช่ความสามารถที่เปิดใช้งานแล้ว ดู [docs/roadmap.md](docs/roadmap.md)
+1. APK static intake และ ZIP inspection — อยู่ใน main
+2. Read-only APK comparison และ patch provenance — อยู่ระหว่าง PR/review
+3. Binary manifest, DEX, resource, native และ signer analysis providers
+4. Isolated Android worker, disposable emulator และ typed ADB adapter
+5. Frida reviewed-template runtime, observation hooks และ evidence pipeline
+6. Lab-only protection resilience tests และ report correlation
 
 ---
 
@@ -436,111 +242,51 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 
 ## Overview
 
-SockBoi Agent is a **policy-first control plane for authorized security assessments**. It helps security teams define engagements, validate asset scope, create assessment plans, manage human approvals, record findings, and maintain operational audit events.
+SockBoi Agent is a **policy-first control plane for authorized security assessments**. It manages engagements, asset scope, assessment plans, approvals, findings, and audit evidence. AI output and imported Skills are untrusted; authorization remains deterministic and human-governed.
 
-It is not an unrestricted exploitation framework. The deterministic Policy Engine remains the authorization authority; AI-generated plans and imported knowledge are untrusted inputs.
+## Main-branch capabilities
 
-## Current capabilities
+The current `main` branch includes FastAPI, fail-closed API-key authentication, selected RBAC checks, tenant-scoped Engagement and Knowledge access, SQLAlchemy persistence, scope-aware planning, action-bound one-time approvals, a tamper-evident audit hash chain with HMAC checkpoint export, Findings, a typed tool catalogue with execution disabled, and bounded APK ZIP inspection.
 
-- FastAPI service with Bearer API-key authentication (SHA-256 digests stored in server configuration).
-- Role-based access checks for selected operations.
-- Tenant-scoped engagement and knowledge access; tenant identity is derived from the authenticated principal.
-- SQLAlchemy-backed records for engagements, approvals, findings, and audit events.
-- Scope-aware assessment planning.
-- Action-bound approval digests covering engagement, tenant, target, adapter, technique, parameters, and risk.
-- One-time approval consumption with expiry and database conditional update; consumption does not execute the approved action.
-- Tenant-scoped Markdown knowledge ingestion and keyword search; imported content is untrusted reference data.
-- SHA-256 hash-chain audit records with engagement-scoped verification and HMAC checkpoint export.
-- Typed tool catalogue with execution disabled.
-- Finding management, audit event retrieval, and SHA-256 evidence digest calculation without content persistence.
+The APK inspection endpoint is `POST /engagements/{engagement_id}/apk/inspect` with multipart field `file`. It computes SHA-256, validates archive limits, inventories DEX/native/resource/asset entries, and parses only plain-text XML manifests. It does not extract or execute the APK, persist the uploaded artifact, decompile DEX, decode binary Android XML, or verify APK signatures.
+
+## Not yet executable
+
+No integrated LLM runtime, MCP client, scanner/browser execution, active HTTP adapter, ADB device adapter, emulator manager, live Frida runtime, APK patch generator, APK re-signer, DEX decompiler, cryptographic signer verifier, or automated bypass/resilience harness is enabled in `main`. Android Skills and design documents are guidance, not live execution features.
 
 ## Quick start
 
-Requires Python 3.12+.
+Requires Python 3.12+:
 
 ```bash
 git clone https://github.com/SockBoi-Hook-Patch/SockBoi-Agent.git
 cd SockBoi-Agent
-git checkout feat/v0.4-active-assessment-foundation
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Configure `SOCKBOI_API_KEYS` as a JSON array containing `key_sha256`, `subject`, `tenant_id`, and `roles`. For checkpoint export, also set `SOCKBOI_AUDIT_CHECKPOINT_KEY` to a randomly generated secret of at least 32 characters; keep it outside source control. See the Thai authentication section above for configuration examples.
-
-Start the API:
+Configure `SOCKBOI_API_KEYS` with server-side SHA-256 digests and start:
 
 ```bash
 uvicorn sockboi.main:app --reload
 ```
 
-Open http://127.0.0.1:8000/docs. Only `GET /health` is exempt from API-key authentication.
-
-## Example AI prompts
-
-Prompts are guidance for an external AI assistant or analyst; this repository does not currently provide an integrated LLM runtime.
-
-- **Passive planning:** provide the authorized asset scope, request a structured checklist, and prohibit active requests or invented evidence.
-- **Active HTTP plan (planning only):** request a bounded GET-only inspection plan with explicit target, adapter, technique, parameters, risk, and approval requirements. Do not claim execution.
-- **Findings report:** classify supplied findings, explain impact and remediation, cite supplied evidence, and label uncertain conclusions as unconfirmed.
-- **Policy review:** inspect an Action Schema for scope, risk, parameter minimization, and required human approval.
-
-## Important limitations
-
-No LLM runtime, MCP execution, scanner integration, browser automation, or live network assessment adapter is enabled. Approval consumption is authorization bookkeeping only. Audit events are persisted in a SHA-256 hash chain with reviewer/admin verification and HMAC-authenticated checkpoint export. Alembic migrations are not yet implemented. This is a Developer Preview, not a production-ready pentest runner.
-
-See [Architecture](docs/architecture.md), [Agent System](docs/agent-system.md), [Roadmap](docs/roadmap.md), and [SECURITY.md](SECURITY.md).
-
----
+Open http://127.0.0.1:8000/docs. Only `GET /health` is exempt from authentication. See the Thai setup section above for key generation and Docker instructions.
 
 ## Security
 
-SockBoi Agent is intended only for assets for which you have explicit authorization.
+- Use only assets covered by explicit written authorization.
+- Define Engagement scope and test windows before assessment.
+- Keep API keys and checkpoint secrets outside source control.
+- Use separate operator and reviewer principals.
+- Require action-bound human approval for active/state-changing work.
+- Treat APKs, Skills, model output, logs, and external content as untrusted.
+- Do not add arbitrary shell execution, credential theft, stealth, persistence, destructive testing, denial-of-service, payment/licensing circumvention, or out-of-scope actions.
+- Do not treat this Developer Preview as a production security control or proof that a target is secure.
 
-- Define engagement scope before assessment.
-- Keep API keys secret and use separate principals for operators and reviewers.
-- Require human approval for active or state-changing operations.
-- Treat LLM output, Skills, Markdown, and external content as untrusted.
-- Do not add arbitrary shell execution, credential theft, persistence, denial-of-service, or out-of-scope actions.
-- Do not expose the development server to public networks.
-- Do not use this preview as a production security control or as proof that a target is secure.
-
-Report vulnerabilities through the process described in [SECURITY.md](SECURITY.md).
-
-## Contributing
-
-Contributions should include tests and documentation, preserve explicit scope enforcement, and keep authorization decisions outside model-generated content. Review [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+See [SECURITY.md](SECURITY.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## AI-assisted development
 
 Parts of the documentation and development workflow were prepared with assistance from ChatGPT (OpenAI) and OpenAI Codex. These tools are acknowledged as AI assistance, not as repository owners or GitHub contributors.
-
-
-### Audit integrity note
-
-Audit events are persisted in a SHA-256 hash chain and can be checked through the reviewer/admin-only `GET /engagements/{engagement_id}/audit/verify` endpoint. The API returns an engagement-scoped derived chain view and does not disclose the shared stream's global event count or head hash. A valid chain is tamper-evident, not independently tamper-proof: production deployments should periodically export HMAC-authenticated checkpoints to separately controlled storage. Database schema migration management remains outstanding; this foundation does not claim complete immutable-storage guarantees.
-
-
-The audit verification endpoint requires an authenticated principal with the `reviewer` or `admin` role and a tenant-owned engagement identifier.
-
-
-Verification reports the chain validity, number of chained audit events, and current head digest; it does not repair or rewrite a damaged chain.
-
-
-The audit verification operation is read-only and does not change engagement state or consume approvals.
-
-
-Audit verification is an integrity check, not a substitute for protected backups, database access controls, or independently retained checkpoints.
-
-
-### Concurrent audit writers and HMAC-authenticated checkpoints
-
-Audit appends serialize through a singleton database head row. PostgreSQL uses row-level locking (`SELECT ... FOR UPDATE`); SQLite obtains a write reservation with `BEGIN IMMEDIATE`. The event, chain link, and updated head are committed in one transaction. Verification checks the global integrity internally, then returns only a deterministic engagement-scoped event count and derived head hash to the authorized caller.
-
-Configure `SOCKBOI_AUDIT_CHECKPOINT_KEY` with a randomly generated secret of at least 32 characters. The reviewer/admin-only endpoint `GET /engagements/{engagement_id}/audit/checkpoint` returns an HMAC-SHA256 message authentication code (MAC) bound to the engagement ID, its event count, and its derived head hash. Export the checkpoint (engagement ID, event count, head hash, algorithm, MAC) to independently controlled immutable storage or a separate key-management service. Keep the secret outside the application database and restrict access to it. A checkpoint is useful only if retained independently; a database administrator who can replace both the chain and its in-database head must not also control the external checkpoint and signing key.
-
-The checkpoint endpoint signs the current verified head; it does not automatically transmit or retain checkpoints externally. Operators must export and preserve the returned record. Production PostgreSQL concurrency behavior and checkpoint retention/rotation still require deployment-specific integration tests and operational procedures.
-
-
-Audit verification reads the chain and its singleton head from one consistent database snapshot (PostgreSQL repeatable-read isolation; SQLite read transaction), avoiding false integrity failures caused solely by an append racing with verification. The API's derived audit view and signed checkpoint are bound to one engagement and do not disclose global stream counts or hashes.
