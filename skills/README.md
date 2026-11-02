@@ -16,6 +16,7 @@ Start with [APK Static Triage](apk-static-triage/SKILL.md), then load only the s
 - [Framework Analysis](android-framework-analysis/SKILL.md): Flutter, Unity/IL2CPP, React Native and managed runtime triage.
 - [ADB Device](adb-android-device/SKILL.md): bounded device inventory, package metadata, approved install/launch, logs and evidence.
 - [Frida Runtime](frida-android-runtime/SKILL.md): approval-gated process instrumentation using reviewed, hash-pinned observation scripts.
+- [Android Control Resilience](android-control-resilience/SKILL.md): authorized lab assessment of security-control enforcement.
 - [Hook Audit](android-hook-audit/SKILL.md): metadata-only runtime observation with Frida.
 - [Patch Integrity Audit](android-patch-integrity-audit/SKILL.md): original-versus-modified APK comparison and signer-integrity workflow.
 - [Protection Resilience Audit](android-protection-resilience-audit/SKILL.md): controlled lab validation of anti-tamper, root/emulator, debugger and TLS trust controls.
