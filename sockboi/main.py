@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .agents.planner import AssessmentPlan, build_plan
 from .apk_inspector import MAX_APK_BYTES, ApkInspectionError, inspect_apk_bytes
+from .apk_patch_audit import ApkPatchAuditError, compare_apk_bytes
 from .approval import ActionEnvelope
 from .evidence import sha256_hex
 from .knowledge import skill_library
@@ -381,3 +382,61 @@ async def inspect_apk(
         return result
     finally:
         await file.close()
+
+
+async def _read_patch_upload(upload: UploadFile, engagement_id: UUID, request: Request) -> bytes:
+    payload = bytearray()
+    while chunk := await upload.read(1024 * 1024):
+        if len(payload) + len(chunk) > MAX_APK_BYTES:
+            store.log(AuditEvent(
+                engagement_id=engagement_id,
+                event_type="apk.patch_audit.rejected",
+                actor=_principal(request).subject,
+                detail={"reason": "size_limit", "limit_bytes": MAX_APK_BYTES},
+            ))
+            raise HTTPException(413, "Each APK must be within the configured upload size limit")
+        payload.extend(chunk)
+    return bytes(payload)
+
+
+@app.post("/engagements/{engagement_id}/apk/patch-audit")
+async def audit_apk_patch(
+    engagement_id: UUID,
+    request: Request,
+    original_file: Annotated[UploadFile, File()],
+    patched_file: Annotated[UploadFile, File()],
+) -> dict:
+    """Compare two APK builds read-only; no patching, extraction, install, or execution."""
+    _require_role(request, "admin", "operator")
+    _get_engagement(engagement_id, request)
+    try:
+        original = await _read_patch_upload(original_file, engagement_id, request)
+        patched = await _read_patch_upload(patched_file, engagement_id, request)
+        try:
+            result = compare_apk_bytes(original, patched)
+        except ApkPatchAuditError as exc:
+            store.log(AuditEvent(
+                engagement_id=engagement_id,
+                event_type="apk.patch_audit.rejected",
+                actor=_principal(request).subject,
+                detail={"reason": str(exc)[:200]},
+            ))
+            raise HTTPException(400, str(exc)) from exc
+
+        store.log(AuditEvent(
+            engagement_id=engagement_id,
+            event_type="apk.patch_audit.completed",
+            actor=_principal(request).subject,
+            detail={
+                "original_sha256": result["original"]["sha256"],
+                "patched_sha256": result["patched"]["sha256"],
+                "added_count": result["summary"]["added_count"],
+                "removed_count": result["summary"]["removed_count"],
+                "changed_count": result["summary"]["changed_count"],
+                "changes_truncated": result["changes_truncated"],
+            },
+        ))
+        return result
+    finally:
+        await original_file.close()
+        await patched_file.close()
