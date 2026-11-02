@@ -61,9 +61,10 @@ SockBoi Agent คือ **Control Plane สำหรับงาน Security Ass
 | Typed Tool Registry | มี | แสดงรายการเครื่องมือและ schema; ปิดการ execute |
 | Findings | มี | บันทึก Finding ที่ผูกกับ Engagement และตรวจ Scope |
 | Audit Events | มี | บันทึกเหตุการณ์สำคัญของระบบ |
-| Evidence Hash | มี | คำนวณ SHA-256 โดยไม่เก็บเนื้อหาหลักฐาน |\n|
-| APK ZIP Inspection | มี (static triage) | `POST /engagements/{id}/apk/inspect` ตรวจ ZIP, hash, DEX/native inventory และ plain XML manifest; ไม่เก็บ APK หรือ execute code |
-| APK Patch Audit | มี (read-only) | POST /engagements/{id}/apk/patch-audit เปรียบเทียบ APK ต้นฉบับและไฟล์ที่ Patch แล้วด้วย SHA-256 ของสมาชิก ZIP; ไม่แก้ไขหรือ Execute |\n| Hash-chain Audit Integration | มี | บันทึกแบบ Hash Chain, ตรวจสอบได้ และมี Checkpoint แยกตาม Engagement |
+| Evidence Hash | มี | คำนวณ SHA-256 โดยไม่เก็บเนื้อหาหลักฐาน |
+| APK ZIP Inspection | มี (static triage) | POST /engagements/{id}/apk/inspect ตรวจ ZIP, hash, DEX/native inventory และ plain XML manifest; ไม่เก็บ APK หรือ execute code |
+| APK Patch Audit | มี (read-only) | POST /engagements/{id}/apk/patch-audit เปรียบเทียบ APK ต้นฉบับกับไฟล์ Patch ด้วย SHA-256 ของสมาชิก ZIP; ไม่แก้ไขหรือ Execute |
+| Hash-chain Audit Integration | มี | บันทึกแบบ Hash Chain, ตรวจสอบได้ และมี Checkpoint แยกตาม Engagement |
 | LLM Runtime | ยังไม่มี | ยังไม่มีการเชื่อม Provider เพื่อให้ LLM ทำงานใน API flow |
 | MCP Runtime / Scanner Execution | ยังไม่มี | ยังไม่มีการเรียก MCP Server, Nmap, ZAP หรือ Scanner จริง |
 
@@ -403,7 +404,7 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 | GET | `/knowledge/search?query=...` | ค้นหา Knowledge ภายใน Tenant ของผู้เรียก |
 | GET | `/tools` | ดู Typed Tool Catalog (execution disabled) |
 | POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |\n| POST | `/engagements/{id}/apk/inspect` | Upload APK แบบ tenant-scoped เพื่อ static ZIP inventory และ manifest XML แบบ text; ไม่เก็บไฟล์ต้นฉบับ |
-| POST | `/engagements/{id}/apk/patch-audit` | เปรียบเทียบ APK ต้นฉบับกับ APK ที่แก้ไขแบบ read-only; ไม่ Patch หรือ Execute |\n| POST | `/engagements/{id}/apk/patch-audit` | เปรียบเทียบ APK ต้นฉบับกับ APK ที่แก้ไขแบบ read-only; ไม่ Patch หรือ Execute |
+| POST | `/engagements/{id}/apk/patch-audit` | เปรียบเทียบ APK ต้นฉบับกับ APK ที่แก้ไขแบบ read-only; ไม่ Patch หรือ Execute |
 
 ดู Request/Response Schema แบบเต็มและทดลองเรียกได้ที่ Swagger UI: `/docs`
 
