@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .agents.planner import AssessmentPlan, build_plan
 from .apk_inspector import MAX_APK_BYTES, ApkInspectionError, inspect_apk_bytes
+from .apk_patch_audit import compare_apk_bytes
 from .approval import ActionEnvelope
 from .evidence import sha256_hex
 from .knowledge import skill_library
@@ -381,3 +382,62 @@ async def inspect_apk(
         return result
     finally:
         await file.close()
+
+
+@app.post("/engagements/{engagement_id}/apk/compare")
+async def compare_apk_artifacts(
+    engagement_id: UUID,
+    request: Request,
+    original_file: Annotated[UploadFile, File()],
+    modified_file: Annotated[UploadFile, File()],
+) -> dict:
+    """Compare two owner-supplied APKs offline; never extracts, executes, or patches them."""
+    _require_role(request, "admin", "operator")
+    _get_engagement(engagement_id, request)
+
+    async def read_bounded(upload: UploadFile, label: str) -> bytes:
+        payload = bytearray()
+        while chunk := await upload.read(1024 * 1024):
+            if len(payload) + len(chunk) > MAX_APK_BYTES:
+                store.log(AuditEvent(
+                    engagement_id=engagement_id,
+                    event_type="apk.compare.rejected",
+                    actor=_principal(request).subject,
+                    detail={"artifact_role": label, "reason": "size_limit",
+                            "limit_bytes": MAX_APK_BYTES},
+                ))
+                raise HTTPException(413, f"{label} APK exceeds configured upload size limit")
+            payload.extend(chunk)
+        return bytes(payload)
+
+    try:
+        original = await read_bounded(original_file, "original")
+        modified = await read_bounded(modified_file, "modified")
+        try:
+            result = compare_apk_bytes(original, modified)
+        except ApkInspectionError as exc:
+            store.log(AuditEvent(
+                engagement_id=engagement_id,
+                event_type="apk.compare.rejected",
+                actor=_principal(request).subject,
+                detail={"reason": str(exc)[:200]},
+            ))
+            raise HTTPException(400, str(exc)) from exc
+
+        store.log(AuditEvent(
+            engagement_id=engagement_id,
+            event_type="apk.compare.completed",
+            actor=_principal(request).subject,
+            detail={
+                "original_sha256": result["original_sha256"],
+                "modified_sha256": result["modified_sha256"],
+                "change_count": result["change_count"],
+                "security_relevant_change_count": len(result["security_relevant_changes"]),
+                "package_identity_match": result["package_identity_match"],
+                "signer_status": result["signer_comparison"]["status"],
+            },
+        ))
+        return result
+    finally:
+        await original_file.close()
+        await modified_file.close()
