@@ -16,14 +16,16 @@ Start with [APK Static Triage](apk-static-triage/SKILL.md), then load only the s
 - [Framework Analysis](android-framework-analysis/SKILL.md): Flutter, Unity/IL2CPP, React Native and managed runtime triage.
 - [ADB Device](adb-android-device/SKILL.md): bounded device inventory, package metadata, approved install/launch, logs and evidence.
 - [Frida Runtime](frida-android-runtime/SKILL.md): approval-gated process instrumentation using reviewed, hash-pinned observation scripts.
+- [Patch Audit](android-patch-audit/SKILL.md): read-only original-versus-patched APK member comparison.
+- [Control Resilience](android-control-resilience/SKILL.md): authorized lab tests for security-control enforcement.
 - [Evidence and Reporting](android-evidence-report/SKILL.md): artifact-to-finding provenance, confidence, coverage and remediation.
 
 See [APK Reverse Engineering Roadmap](../docs/apk-reverse-engineering-roadmap.md) and [Android Dynamic Assessment](../docs/android-dynamic-assessment.md).
 
 ## Current implementation status
 
-- Implemented: bounded offline APK ZIP inventory, SHA-256, DEX/native/resource/asset presence, limited ELF header metadata and plain-text XML manifest summary.
+- Implemented: bounded offline APK ZIP inventory and read-only original-versus-patched APK ZIP-member hash comparison API.
 - Playbooks only: JADX, Apktool, ADB, Frida, native analysis providers and framework-specific analysis.
-- Not implemented: binary Android XML decoding, DEX decompilation, cryptographic APK signature verification, JNI binding analysis, emulator lifecycle, live ADB/Frida adapters and automated finding generation.
+- Not implemented: binary Android XML decoding, DEX decompilation, cryptographic APK signature verification, JNI binding analysis, emulator lifecycle, live ADB/Frida adapters, semantic DEX patch analysis and behavior-changing lab instrumentation.
 
 A Skill describing a workflow does not mean its external tools are installed or executable. Runtime loader and automated Skill validation remain planned.
