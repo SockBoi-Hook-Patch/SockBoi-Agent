@@ -55,12 +55,12 @@ SockBoi Agent คือ **Control Plane สำหรับ Security Assessment �
 | Typed Tool Catalog | Implemented | แสดง tool/schema แต่ execution ถูกปิด |
 | Findings / Evidence hash | Implemented | จัดเก็บ Finding และคำนวณ SHA-256 digest โดยไม่เก็บ evidence content ผ่าน hash endpoint |
 | APK static inspection | Implemented | Upload APK แบบ bounded; ZIP safety checks, SHA-256, DEX/native/resource inventory และ parse plain-text XML manifest |
-| APK patch comparison | Planned / PR review | ยังไม่อยู่ใน `main`; byte-level archive diff และ patch audit อยู่ระหว่างพัฒนา |
+| APK patch comparison | Implemented | `POST /engagements/{id}/apk/compare` เปรียบเทียบ ZIP members ด้วย SHA-256; read-only และไม่สร้าง APK ใหม่ |
 | JADX / Apktool / binary manifest | Planned | ยังไม่มี decompilation หรือ binary XML decoder |
 | APK signer verification | Planned | การพบ META-INF signature files ไม่ใช่การยืนยันลายเซ็นเชิงคริปโต |
 | ADB / Emulator Manager | Skill / Design only | ยังไม่มี live ADB adapter หรือ disposable emulator manager |
 | Frida / Runtime Hook | Skill / Template only | ยังไม่มี live Frida runtime; ตัวอย่าง hook ไม่ได้ถูกรันโดย API |
-| Protection resilience / bypass audit | Design / Lab workflow | ยังไม่มี automated runtime test harness |
+| Protection resilience / bypass audit | Skill / Lab workflow | มี test playbook สำหรับ lab; ยังไม่มี automated runtime test harness หรือ live bypass execution |
 | Patch generation / APK repackaging | Not implemented | ไม่มีระบบแก้ไข/repackage/re-sign APK |
 | LLM / MCP / Scanner execution | Not implemented | ไม่มี integrated LLM, MCP client หรือ Nmap/ZAP/Browser execution |
 
@@ -222,6 +222,7 @@ Approval ที่อนุมัติแล้วมีอายุ 15 นา�
 | GET | `/tools` | ดู Typed Tool Catalog |
 | POST | `/evidence/hash` | คำนวณ SHA-256 |
 | POST | `/engagements/{id}/apk/inspect` | ตรวจ APK แบบ static ZIP inventory |
+| POST | `/engagements/{id}/apk/compare` | เปรียบเทียบ APK ต้นฉบับกับ APK ที่แก้ไขแบบ read-only; ไม่ execute หรือสร้าง APK |
 
 Request/response schema ที่แน่นอนให้ดู Swagger UI ที่ `/docs`
 
@@ -230,7 +231,7 @@ Request/response schema ที่แน่นอนให้ดู Swagger UI �
 ดู [docs/roadmap.md](docs/roadmap.md) สำหรับ milestone และสถานะล่าสุด ภาพรวมลำดับงาน Android:
 
 1. APK static intake และ ZIP inspection — อยู่ใน main
-2. Read-only APK comparison และ patch provenance — อยู่ระหว่าง PR/review
+2. Read-only APK comparison และ patch provenance — อยู่ใน main (PR #8)
 3. Binary manifest, DEX, resource, native และ signer analysis providers
 4. Isolated Android worker, disposable emulator และ typed ADB adapter
 5. Frida reviewed-template runtime, observation hooks และ evidence pipeline
@@ -246,13 +247,13 @@ SockBoi Agent is a **policy-first control plane for authorized security assessme
 
 ## Main-branch capabilities
 
-The current `main` branch includes FastAPI, fail-closed API-key authentication, selected RBAC checks, tenant-scoped Engagement and Knowledge access, SQLAlchemy persistence, scope-aware planning, action-bound one-time approvals, a tamper-evident audit hash chain with HMAC checkpoint export, Findings, a typed tool catalogue with execution disabled, and bounded APK ZIP inspection.
+The current `main` branch includes FastAPI, fail-closed API-key authentication, selected RBAC checks, tenant-scoped Engagement and Knowledge access, SQLAlchemy persistence, scope-aware planning, action-bound one-time approvals, a tamper-evident audit hash chain with HMAC checkpoint export, Findings, a typed tool catalogue with execution disabled, bounded APK ZIP inspection, and read-only original-versus-modified APK ZIP-member comparison.
 
-The APK inspection endpoint is `POST /engagements/{engagement_id}/apk/inspect` with multipart field `file`. It computes SHA-256, validates archive limits, inventories DEX/native/resource/asset entries, and parses only plain-text XML manifests. It does not extract or execute the APK, persist the uploaded artifact, decompile DEX, decode binary Android XML, or verify APK signatures.
+The APK inspection endpoint is `POST /engagements/{engagement_id}/apk/inspect` with multipart field `file`. It computes SHA-256, validates archive limits, inventories DEX/native/resource/asset entries, and parses only plain-text XML manifests. The read-only comparison endpoint is `POST /engagements/{engagement_id}/apk/compare` with multipart fields `original_file` and `modified_file`; it reports changed/added/removed ZIP members, package identity when plain XML is parseable, and signer status as `not_verified`. Neither endpoint extracts or executes the APK or persists uploaded APK bytes. No DEX decompilation, binary Android XML decoding, or cryptographic APK signature verification is enabled.
 
 ## Not yet executable
 
-No integrated LLM runtime, MCP client, scanner/browser execution, active HTTP adapter, ADB device adapter, emulator manager, live Frida runtime, APK patch generator, APK re-signer, DEX decompiler, cryptographic signer verifier, or automated bypass/resilience harness is enabled in `main`. Android Skills and design documents are guidance, not live execution features.
+No integrated LLM runtime, MCP client, scanner/browser execution, active HTTP adapter, ADB device adapter, emulator manager, live Frida runtime, APK patch generator, APK re-signer, DEX decompiler, cryptographic signer verifier, or automated bypass/resilience harness is enabled in `main`. A reviewed observation-only Frida template and Android Control Resilience Skill are included as guidance only; they are not executed by the API.
 
 ## Quick start
 
