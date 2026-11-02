@@ -46,15 +46,31 @@ Original APK + modified APK (optional)
 
 ### Hook audit
 
-Observe selected lifecycle, app API, network metadata, cryptographic API metadata, storage operation metadata, and app-reported trust-control outcomes. The default mode is metadata-only. Hook templates must be reviewed, version-controlled, hash-pinned and approved. The baseline must not alter method arguments or return values.
+Observe selected lifecycle, app API, network metadata, cryptographic API metadata, storage operation metadata, and app-reported trust-control outcomes. The intended Frida profile is metadata-only. Hook templates must be reviewed, version-controlled, hash-pinned and approved. They must not alter method arguments or return values.
+
+**Current status:** The Hook Audit Skill is a playbook only. No Frida client, device transport, template registry, or live hook execution is included.
 
 ### Patch integrity audit
 
-Compare the original and modified artifacts without changing either input. Report added/removed/changed archive members, manifest and permission deltas, DEX/native/resource changes, package identity and signer verification status. A provider that is unavailable must produce an explicit unknown result; inventory of signing files is not cryptographic signature verification.
+The code now provides offline APK comparison through:
+
+`POST /engagements/{engagement_id}/apk/compare`
+
+Submit two multipart files named `original_file` and `modified_file`. The endpoint:
+- enforces the existing per-file APK size limit and ZIP safety checks;
+- computes independent SHA-256 digests;
+- compares archive members and reports added, removed and changed entries;
+- flags security-relevant paths such as the manifest, DEX, native libraries, signing metadata and network-security resources;
+- reports package identity match when both manifests are parseable;
+- emits a tenant-scoped audit event with artifact hashes and change counts.
+
+The comparison reads bounded ZIP members in memory; it does not extract files to disk, execute either APK, modify source artifacts, or generate an output APK. It identifies DEX/native changes by member digest only; it does not decompile code or establish semantic changes. APK signer cryptographic validity remains **not verified**.
 
 ### Protection resilience audit
 
 Evaluate root/emulator/debugger/instrumentation detection, APK integrity, TLS trust validation and runtime tamper response using purpose-built lab fixtures or owner-provided test builds. Report whether each documented expected behavior was observed. A Frida attach is not proof of bypass; an app crash is not proof of an effective defense.
+
+**Current status:** Test methodology is documented, but there is no automated protection test harness or live Frida runtime. No production bypass mechanism is provided.
 
 ## Policy and safety requirements
 
@@ -70,17 +86,22 @@ Evaluate root/emulator/debugger/instrumentation detection, APK integrity, TLS tr
 
 ## Current implementation status
 
-**Added in this change:** versioned Skill playbooks, evidence schemas, workflows, risk boundaries and acceptance-test requirements.
+**Implemented in code on this feature branch:**
+- Safe offline APK ZIP inspection and tenant-scoped `/apk/inspect` endpoint (from the parent Android foundation PR).
+- Offline original-versus-modified APK member comparison and tenant-scoped `/apk/compare` endpoint.
+- SHA-256 provenance, bounded upload handling, ZIP safety validation, package identity comparison where parseable, and audit events.
+- Unit and API tests for member deltas, package mismatch, malformed APKs, size limits and tenant isolation.
 
-**Not implemented yet:** executable Frida templates/runtime, ADB adapter, emulator manager, original-versus-patched APK diff engine, DEX/resource diff providers, cryptographic signer verification, automated protection test harness, evidence graph and finding generator.
+**Playbooks only / not live execution:** ADB adapter, emulator manager, Frida runtime, reviewed script registry, runtime hook execution, protection-resilience automation and bypass testing.
 
-Do not advertise these playbooks as live capabilities. A feature is implemented only after code, automated tests, isolated integration tests and a verified CI run.
+**Still planned:** DEX/resource semantic diff providers, cryptographic APK signer verification, isolated Android worker, evidence graph and automated finding generation.
+
+Do not advertise playbooks as live capabilities. A feature is implemented only after code, automated tests, isolated integration tests and a verified CI run.
 
 ## Implementation sequence
 
 1. Build a typed Frida observation adapter with reviewed template registry and mock transport tests.
 2. Build isolated disposable-emulator lifecycle and bounded ADB adapter.
-3. Add APK artifact-pair records and ZIP/manifest comparison.
-4. Add sandboxed DEX/resource/native providers and cryptographic signer verification.
-5. Add owner-controlled protection test fixtures and resilience outcome reporting.
-6. Connect evidence provenance and findings to the existing tenant-scoped audit model.
+3. Add sandboxed DEX/resource/native providers and cryptographic signer verification.
+4. Add owner-controlled protection test fixtures and resilience outcome reporting.
+5. Connect evidence provenance and findings to the existing tenant-scoped audit model.
