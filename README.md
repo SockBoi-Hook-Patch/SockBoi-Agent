@@ -401,7 +401,7 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 | POST | `/knowledge/ingest` | นำเข้า Markdown แบบ Tenant-scoped (admin/operator) |
 | GET | `/knowledge/search?query=...` | ค้นหา Knowledge ภายใน Tenant ของผู้เรียก |
 | GET | `/tools` | ดู Typed Tool Catalog (execution disabled) |
-| POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |\n| POST | `/engagements/{id}/apk/inspect` | Upload APK แบบ tenant-scoped เพื่อ static ZIP inventory และ manifest XML แบบ text; ไม่เก็บไฟล์ต้นฉบับ |
+| POST | `/evidence/hash` | คำนวณ SHA-256 โดยไม่บันทึก Content |\n| POST | `/engagements/{id}/apk/inspect` | Upload APK แบบ tenant-scoped เพื่อ static ZIP inventory และ manifest XML แบบ text; ไม่เก็บไฟล์ต้นฉบับ |\n| POST | `/engagements/{id}/apk/patch-audit` | เปรียบเทียบ APK ต้นฉบับกับ APK ที่แก้ไขแบบ read-only; ไม่ Patch หรือ Execute |
 
 ดู Request/Response Schema แบบเต็มและทดลองเรียกได้ที่ Swagger UI: `/docs`
 
@@ -411,7 +411,7 @@ API ต้องใช้ Header `Authorization: Bearer <API_KEY>` ทุก end
 
 - ไม่มี LLM Provider หรือ Prompt-to-Action Runtime ที่เชื่อมใน API
 - ไม่มีการ execute Nmap, Nuclei, ZAP, Browser หรือ MCP tools
-- ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง\n- APK inspection ยังเป็น static ZIP inventory เท่านั้น; ยังไม่มี JADX/Apktool execution, binary manifest decoder, DEX decompilation, signature verification, ADB/Frida runtime adapters
+- ไม่มี Active HTTP Inspection Adapter ที่ทำงานจริง\n- APK inspection เป็น static ZIP inventory; Patch Audit เปรียบเทียบ hash ของสมาชิก ZIP เท่านั้น ยังไม่มี semantic DEX diff, JADX/Apktool execution, binary manifest decoder, signature verification, ADB/Frida runtime adapters
 - Approval Consume เป็นการใช้สิทธิ์ ไม่ใช่การรัน Network Action
 - Database schema ใช้ SQLAlchemy `create_all`; ยังไม่มี Alembic migration workflow
 - ยังไม่มี Alembic migrations, automatic external checkpoint export, approval revocation endpoint หรือ PostgreSQL multi-process integration tests
